@@ -70,6 +70,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
             req.session.name = user.name;
             req.session.role = user.role;
 
+            req.log.info({ session: req.session }, 'Session data after login');
+
             return reply.send({
                 message: 'Logged in successfully',
                 user: {
@@ -84,6 +86,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
 
     // Get current user (requires session)
     app.get('/auth/me', async (req, reply) => {
+        req.log.info({ session: req.session }, 'Session data in /me route');
         if (!req.session.userId) {
             return reply.status(401).send({ error: 'Not authenticated' });
         }

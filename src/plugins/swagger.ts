@@ -27,6 +27,5 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
       docExpansion: 'list',
       deepLinking: false,
     },
-    url: '/documentation/json', // Explicitly point to the OpenAPI spec JSON
   });
 }
