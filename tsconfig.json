@@ -1,0 +1,44 @@
+{
+    "compilerOptions": {
+        /* File Layout */
+        "rootDir": "./src",
+        "outDir": "./dist",
+        /* Environment Settings */
+        "module": "ESNext",
+        "moduleResolution": "bundler",
+        "target": "esnext",
+        "lib": [
+            "esnext"
+        ],
+        "types": [
+            "node"
+        ],
+        /* Emit */
+        "declaration": true,
+        "declarationMap": true,
+        "sourceMap": true,
+        /* Strictness */
+        "strict": true,
+        "noUncheckedIndexedAccess": true,
+        "noImplicitReturns": true,
+        "noFallthroughCasesInSwitch": true,
+        "noUnusedLocals": true,
+        "noUnusedParameters": true,
+        /* Module interop */
+        "esModuleInterop": true,
+        "skipLibCheck": true,
+        "forceConsistentCasingInFileNames": true,
+        "isolatedModules": true,
+        "verbatimModuleSyntax": true,
+        /* Compatibility */
+        "resolveJsonModule": true,
+        "noEmitOnError": true
+    },
+    "include": [
+        "src/**/*"
+    ],
+    "exclude": [
+        "node_modules",
+        "dist"
+    ]
+}
