@@ -3,7 +3,7 @@
  * Use these to clean up, query, and manage test data in the database.
  */
 
-import { db } from '../../db/database';
+import { pool } from '../../db/db';
 import { createHash } from 'crypto';
 
 /**
@@ -11,7 +11,7 @@ import { createHash } from 'crypto';
  * Useful for isolating tests.
  */
 export async function cleanupDatabase(): Promise<void> {
-  await db.deleteFrom('users').execute();
+  await pool.query('DELETE FROM users');
 }
 
 /**
@@ -27,36 +27,33 @@ export async function seedDatabase(): Promise<void> {
 
   for (const admin of adminUsers) {
     const passwordHash = createHash('sha256').update(admin.password).digest('hex');
-    await db
-      .insertInto('users')
-      .values({
-        email: admin.email,
-        name: admin.name,
-        password_hash: passwordHash,
-        role: 'admin',
-      })
-      .execute();
+    await pool.query(
+      'INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4)',
+      [admin.email, admin.name, passwordHash, 'admin']
+    );
   }
 }
 
 /**
  * Get the count of rows in a table.
  */
-export async function getTableRowCount(tableName: any): Promise<number> {
-  const result = await db.selectFrom(tableName).select(db.fn.countAll().as('count')).executeTakeFirst();
-  return Number(result?.count ?? 0);
+export async function getTableRowCount(tableName: string): Promise<number> {
+  const result = await pool.query(`SELECT COUNT(*) as count FROM ${tableName}`);
+  return Number(result.rows[0].count ?? 0);
 }
 
 /**
  * Get a user by email from the database.
  */
 export async function getUserByEmail(email: string) {
-  return await db.selectFrom('users').selectAll().where('email', '=', email).executeTakeFirst();
+  const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+  return result.rows[0];
 }
 
 /**
  * Get a user by ID from the database.
  */
 export async function getUserById(id: string) {
-  return await db.selectFrom('users').selectAll().where('id', '=', id).executeTakeFirst();
+  const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+  return result.rows[0];
 }

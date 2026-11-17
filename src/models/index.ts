@@ -1,20 +1,24 @@
-import { db, type User } from '../db/database';
+import { pool } from '../db/db';
+
+export interface User {
+    id: string;
+    email: string;
+    name: string;
+    password_hash: string;
+    role: 'admin' | 'borrower' | 'lender';
+    created_at: Date;
+    updated_at: Date;
+}
 
 export class UserModel {
     static async findByEmail(email: string): Promise<User | undefined> {
-        return await db
-            .selectFrom('users')
-            .selectAll()
-            .where('email', '=', email)
-            .executeTakeFirst();
+        const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+        return result.rows[0] as User | undefined;
     }
 
     static async findById(id: string): Promise<User | undefined> {
-        return await db
-            .selectFrom('users')
-            .selectAll()
-            .where('id', '=', id)
-            .executeTakeFirst();
+        const result = await pool.query('SELECT * FROM users WHERE id = $1', [id]);
+        return result.rows[0] as User | undefined;
     }
 
     static async create(
@@ -22,25 +26,15 @@ export class UserModel {
         name: string,
         passwordHash: string
     ): Promise<User> {
-        const result = await db
-            .insertInto('users')
-            .values({
-                email,
-                name,
-                password_hash: passwordHash,
-                role: 'admin',
-            })
-            .returningAll()
-            .executeTakeFirstOrThrow();
-
-        return result;
+        const result = await pool.query(
+            'INSERT INTO users (email, name, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING *',
+            [email, name, passwordHash, 'admin']
+        );
+        return result.rows[0] as User;
     }
 
     static async findAll(): Promise<User[]> {
-        return await db
-            .selectFrom('users')
-            .selectAll()
-            .orderBy('created_at', 'desc')
-            .execute();
+        const result = await pool.query('SELECT * FROM users ORDER BY created_at DESC');
+        return result.rows as User[];
     }
 }
