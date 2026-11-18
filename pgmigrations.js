@@ -1,6 +1,6 @@
 module.exports = {
-  databaseUrl: process.env.DATABASE_URL || 'postgresql://postgres:postgres@localhost:5432/micro_finance',
-  migrationsTable: 'pgmigrations',
-  dir: 'src/db/migrations',
-  autoCreate: true,
+    databaseUrl: `postgresql://${process.env.PG_USER}:${process.env.PG_PASSWORD}@${process.env.PG_HOST}:${process.env.PG_PORT}/${process.env.PG_DATABASE}`,
+    migrationsTable: 'pgmigrations',
+    dir: 'src/db/migrations',
+    autoCreate: true,
 };

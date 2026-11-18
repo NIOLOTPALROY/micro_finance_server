@@ -115,21 +115,42 @@ NODE_ENV=development
 
 ```
 src/
-├── routes/              # API routes (separate files)
-│   ├── auth.routes.ts
-│   ├── health.routes.ts
-│   └── index.ts
+├── modules/
+│   ├── auth/                 # Authentication module
+│   ├── health/               # Health-check module
+│   └── member-management/    # Member profile module
+│       ├── member.routes.ts
+│       ├── member.repository.ts
+│       ├── member.schemas.ts
+│       ├── member.types.ts
+│       └── index.ts
+├── shared/
+│   ├── database/        # Shared PostgreSQL pool
+│   └── plugins/         # Shared framework plugins
 ├── __tests__/           # Test files
 │   ├── auth.test.ts
-│   └── health.test.ts
-├── middleware/          # Auth middleware
-├── models/              # Database models
+│   ├── health.test.ts
+│   └── member-management.test.ts
 ├── db/                  # Database setup & migrations
-├── types/               # TypeScript types
 ├── utils/               # Utilities & test helpers
 ├── app.ts               # App factory
 └── server.ts            # Entry point
 ```
+
+### Member personal information (initial module scope)
+
+The admin-only member endpoints currently cover personal information from the
+registration form:
+
+```
+POST   /members           # Create a member profile
+GET    /members           # List profiles (paginated)
+GET    /members/:id       # Get one profile
+PATCH  /members/:id       # Update personal information
+```
+
+Address, family/financial, KYC, nominee, bank, assignment, and approval details
+are intentionally left for later module steps.
 
 ## 🔐 Session Configuration
 

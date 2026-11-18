@@ -3,6 +3,14 @@ import request from 'supertest';
 import { getTestApp } from '../utils/test/setup';
 import { cleanupDatabase, seedDatabase } from '../utils/test/db';
 
+function getSessionCookie(response: { headers: Record<string, string | string[] | undefined> }): string {
+  const cookie = response.headers['set-cookie'];
+  if (Array.isArray(cookie)) {
+    return cookie[0] ?? '';
+  }
+  return cookie ?? '';
+}
+
 describe('Auth Functionality', () => {
   let app: Awaited<ReturnType<typeof getTestApp>>;
 
@@ -62,11 +70,11 @@ describe('Auth Functionality', () => {
     const admin = { email: 'admin1@example.com', password: 'password123' };
 
     const loginRes = await request(app.server).post('/auth/login').send(admin);
-    const cookie = loginRes.headers['set-cookie'];
+    const cookie = getSessionCookie(loginRes);
 
     const meRes = await request(app.server)
       .get('/auth/me')
-      .set('Cookie', cookie as string[]); // Cast to string[]
+      .set('Cookie', cookie);
 
     expect(meRes.status).toBe(200);
     expect(meRes.body).toHaveProperty('user');
@@ -78,16 +86,16 @@ describe('Auth Functionality', () => {
     const admin = { email: 'admin1@example.com', password: 'password123' };
 
     const loginRes = await request(app.server).post('/auth/login').send(admin);
-    const cookie = loginRes.headers['set-cookie'];
+    const cookie = getSessionCookie(loginRes);
 
-    const logoutRes = await request(app.server).post('/auth/logout').set('Cookie', cookie as string[]);
+    const logoutRes = await request(app.server).post('/auth/logout').set('Cookie', cookie);
 
     expect(logoutRes.status).toBe(200);
     expect(logoutRes.body).toHaveProperty('message', 'Logged out successfully');
 
     const meRes = await request(app.server)
       .get('/auth/me')
-      .set('Cookie', cookie as string[]);
+      .set('Cookie', cookie);
 
     expect(meRes.status).toBe(401);
     expect(meRes.body).toHaveProperty('error', 'Not authenticated');

@@ -3,7 +3,7 @@
  * Use these to clean up, query, and manage test data in the database.
  */
 
-import { pool } from '../../db/db';
+import { pool } from '../../shared/database/pool';
 import { createHash } from 'crypto';
 
 /**
