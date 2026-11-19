@@ -7,9 +7,17 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
     openapi: {
       info: {
         title: "Micro Finance API",
-        description: "Stateful authentication backend with sessions",
+        description:
+          "Microfinance backend for authentication and member registration. Member registration requests use a flat payload whose fields are organized and stored by section.",
         version: "1.0.0",
       },
+      tags: [
+        {
+          name: "Member management",
+          description:
+            "Member registration and private member file operations.",
+        },
+      ],
       servers: [
         {
           url: `http://localhost:${process.env.PORT ?? 3000}`,

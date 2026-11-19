@@ -14,7 +14,7 @@ export function generateTestUser(overrides?: Record<string, unknown>) {
         email: generateTestEmail('user'),
         name: 'Test User',
         password: 'password123',
-        role: 'borrower',
+        role: 'member',
         ...overrides,
     };
 }

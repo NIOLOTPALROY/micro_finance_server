@@ -1,251 +1,255 @@
-# Stateful Authentication Backend
+# Microfinance Management Backend
 
-A modern, production-ready backend built with **Fastify**, **PostgreSQL**, and **TypeScript** focused on session-based user authentication.
+A TypeScript backend for microfinance operations, built with Fastify and
+PostgreSQL. The application is organized by feature module so that member
+onboarding and future lending workflows can grow independently.
 
-## ✨ Features
+## Current scope
 
-- **Stateful Authentication** - Server-side session management with secure cookies
-- **User Management** - Registration, login, logout, session check
-- **Secure Sessions** - HTTP-only cookies, CSRF protection, 24-hour expiration
-- **Type Safety** - 100% TypeScript with strict mode
-- **API Documentation** - Swagger/OpenAPI at `/docs`
-- **Comprehensive Testing** - 7 tests with Vitest + Supertest
+The backend currently provides:
 
-## 🚀 Quick Start
+- **Authentication** for staff and member users using cookie-based sessions.
+- **Member registration** covering personal, address, family/financial, KYC,
+  nominee, bank, branch assignment, verification/consent, and internal review
+  information.
+- **Private member file storage** for photographs and supporting documents in
+  separate S3 prefixes, using short-lived signed upload and download URLs.
+- **Health checks** that report API and PostgreSQL connectivity.
+- **OpenAPI documentation** through Swagger UI.
 
-### Prerequisites
-- Node.js 24.4.1+
-- PostgreSQL 12+
+The registration form is separate from loan applications. Loan accounts,
+repayments, and collections are not implemented yet. The `users` table is the
+identity table for every role, including `member`; member personal information,
+address, family/financial, KYC, nominee, bank, and other registration sections
+are stored in their own related tables rather than on the account row or in a
+separate `members` table. Newly registered members do not have login credentials
+until they are activated.
+Member records are assigned to the seeded default branch named
+**Microfinance**; additional branch administration is not implemented yet.
 
-### Setup
+## Technology
+
+- Node.js and TypeScript
+- Fastify 5
+- PostgreSQL with the `pg` driver
+- `node-pg-migrate` for database migrations
+- Fastify cookie/session plugins for authentication
+- Fastify JSON Schema validation
+- Vitest and Supertest for tests
+- Swagger/OpenAPI documentation
+
+## Prerequisites
+
+- Node.js and npm
+- PostgreSQL
+
+## Getting started
+
+1. Install dependencies:
+
+   ```bash
+   npm install
+   ```
+
+2. Create the database:
+
+   ```bash
+   createdb micro_finance
+   ```
+
+   Alternatively, create it using your PostgreSQL administration tool.
+
+3. Configure the environment:
+
+   ```bash
+   cp .env.example .env
+   ```
+
+   Update `.env` with the PostgreSQL connection details, a strong,
+   unpredictable `SESSION_SECRET`, a random 32-byte
+   `MEMBER_DATA_ENCRYPTION_KEY`, and the S3 bucket and region. Generate the
+   encryption key with:
+
+   ```bash
+   openssl rand -hex 32
+   ```
+
+   Keep both secrets out of source control and preserve the encryption key
+   securely; existing sensitive member data cannot be decrypted without it.
+   The AWS SDK uses its default credential provider chain. Use an IAM role in
+   production; for local development, provide AWS credentials through your
+   local environment or AWS profile.
+
+4. Apply migrations. The migration configuration reads `PG_*` variables from
+   the current shell environment. In Bash or Zsh, load the values from `.env`
+   before running the migration:
+
+   ```bash
+   set -a
+   source .env
+   set +a
+   npm run db:migrate
+   ```
+
+5. Start the development server:
+
+   ```bash
+   npm run dev
+   ```
+
+The service runs at `http://localhost:3000`. Browse the API reference and
+interactive documentation at `http://localhost:3000/docs`.
+
+## Configuration
+
+| Variable | Description | Default |
+| --- | --- | --- |
+| `PG_HOST` | PostgreSQL server host | `localhost` |
+| `PG_PORT` | PostgreSQL server port | `5432` |
+| `PG_DATABASE` | Database name | `micro_finance` |
+| `PG_USER` | Database user | `postgres` |
+| `PG_PASSWORD` | Database password | `postgres` |
+| `SESSION_SECRET` | Secret used to sign session cookies | Development fallback |
+| `MEMBER_DATA_ENCRYPTION_KEY` | 32-byte hex key for sensitive member data | Required for sensitive data |
+| `AWS_REGION` | AWS region containing the S3 bucket | Required for S3 file storage |
+| `AWS_S3_BUCKET` | Private S3 bucket name | Required for S3 file storage |
+| `AWS_S3_IMAGES_PREFIX` | S3 key prefix for member photographs | `members/images` |
+| `AWS_S3_DOCUMENTS_PREFIX` | S3 key prefix for member documents | `members/documents` |
+| `AWS_S3_UPLOAD_URL_TTL_SECONDS` | Lifetime of signed upload forms | `300` |
+| `AWS_S3_DOWNLOAD_URL_TTL_SECONDS` | Lifetime of signed download URLs | `300` |
+| `AWS_S3_MAX_IMAGE_BYTES` | Maximum image size | `5242880` |
+| `AWS_S3_MAX_DOCUMENT_BYTES` | Maximum document size | `10485760` |
+| `PORT` | HTTP port | `3000` |
+| `HOST` | Address to bind the server to | `0.0.0.0` |
+| `NODE_ENV` | Runtime environment | `development` |
+
+The application loads `.env` when starting the server and when running the
+seed script. Database migrations use the `PG_*` variables in the shell
+environment, as shown above.
+
+## AWS S3 setup
+
+Create a bucket in the region configured by `AWS_REGION`. Keep **Block all
+public access** enabled, use bucket-owner-enforced object ownership, and enable
+default server-side encryption. Uploads are signed to require SSE-S3 encryption.
+The application stores S3 object keys, not public URLs; it checks that referenced
+objects exist, belong to the correct prefix, and meet the configured size and
+content-type rules.
+
+Grant the application IAM role `s3:PutObject` and `s3:GetObject` for objects
+under both configured prefixes. The service does not need public bucket access.
+If you grant `s3:ListBucket` so missing-object checks return a not-found response,
+scope it to this bucket and the configured prefixes. Do not use long-lived AWS
+credentials in production.
+
+For browser-based direct uploads and downloads, configure bucket CORS for the
+specific frontend origin. Allow `POST`, `GET`, and `HEAD`, and the headers sent
+by the browser (often `*` is used for allowed headers). Do not use a wildcard
+origin for a production frontend.
+
+The upload form accepts JPEG, PNG, and WebP images, plus PDF, JPEG, and PNG
+documents. Keep the environment prefixes distinct. AWS credentials are not
+required in `.env` when the application runs with an IAM role.
+
+## API documentation
+
+API endpoints, schemas, and examples are maintained in Swagger rather than
+duplicated in this README. Start the service and open
+`http://localhost:3000/docs` to view the current documentation.
+
+## Database
+
+Migrations are in `src/db/migrations/`:
+
+1. `001_create_users_table.sql` — staff/user accounts.
+2. `002_create_session_table.sql` — session table schema (the current
+   application session configuration uses cookie-based sessions).
+3. `003_create_members_table.sql` — member personal information and
+   created/updated-by references (legacy schema).
+4. `004_expand_member_registration.sql` — default branch, complete registration
+   fields, member numbers, and encrypted sensitive-data storage (legacy schema).
+5. `005_normalize_member_sections.sql` — splits member registration details
+   into related one-to-one tables.
+6. `006_use_users_for_members.sql` — moves member identities into `users`,
+   changes the `borrower` role to `member`, and re-keys member sections to users.
+7. `007_separate_member_personal_information.sql` — moves member personal
+   information out of `users` into its own related table.
+
+Run migrations with:
 
 ```bash
-# 1. Install dependencies
-npm install
-
-# 2. Create database
-psql -U postgres -c "CREATE DATABASE micro_finance;"
-
-# 3. Configure environment
-cp .env.example .env
-
-# 4. Setup database schema
-npm run db:setup
-
-# 5. Start development server
-npm run dev
+npm run db:migrate
 ```
 
-Access the API at `http://localhost:3000/docs`
-
-## 📋 API Endpoints
-
-### Authentication
-
-```
-POST   /auth/register       # Register new user
-POST   /auth/login          # Login user
-GET    /auth/me             # Get current user (requires session)
-POST   /auth/logout         # Logout user (requires session)
-```
-
-### Health
-
-```
-GET    /health              # System status
-```
-
-## 🧪 Testing
+The optional seed command is for development only:
 
 ```bash
-npm test                    # Run all tests
-npm run test:watch          # Watch mode
-npm run test:coverage       # Coverage report
-npm run test:ui             # Vitest UI dashboard
+npm run db:seed
 ```
 
-## 📊 Tech Stack
+**Warning:** the current seed script deletes all rows from `users` before
+inserting its development admin users. Do not run it against a database
+containing real users or production data.
 
-| Component | Technology |
-|-----------|-----------|
-| Framework | Fastify 5 |
-| Language | TypeScript 7 |
-| Database | PostgreSQL |
-| Sessions | @fastify/session |
-| Validation | Zod |
-| Testing | Vitest |
+## Project structure
 
-## 🛠️ Scripts
-
-```bash
-# Development
-npm run dev                 # Start with hot reload
-npm run build               # Compile TypeScript
-npm start                   # Production start
-
-# Database
-npm run db:setup            # Create database schema
-
-# Testing
-npm test                    # Run tests
-npm run test:watch          # Watch mode
-npm run test:coverage       # Coverage report
-```
-
-## ⚙️ Environment Variables
-
-```env
-# PostgreSQL
-PG_HOST=localhost
-PG_PORT=5432
-PG_DATABASE=micro_finance
-PG_USER=postgres
-PG_PASSWORD=postgres
-
-# Session
-SESSION_SECRET=your-secret-key
-
-# Server
-PORT=3000
-HOST=0.0.0.0
-NODE_ENV=development
-```
-
-## 📁 Project Structure
-
-```
+```text
 src/
 ├── modules/
-│   ├── auth/                 # Authentication module
-│   ├── health/               # Health-check module
-│   └── member-management/    # Member profile module
-│       ├── member.routes.ts
-│       ├── member.repository.ts
-│       ├── member.schemas.ts
-│       ├── member.types.ts
-│       └── index.ts
+│   ├── auth/                  # Authentication and authorization
+│   ├── health/                # Service health checks
+│   └── member-management/     # Member onboarding
 ├── shared/
-│   ├── database/        # Shared PostgreSQL pool
-│   └── plugins/         # Shared framework plugins
-├── __tests__/           # Test files
-│   ├── auth.test.ts
-│   ├── health.test.ts
-│   └── member-management.test.ts
-├── db/                  # Database setup & migrations
-├── utils/               # Utilities & test helpers
-├── app.ts               # App factory
-└── server.ts            # Entry point
+│   ├── database/              # Shared PostgreSQL pool
+│   └── plugins/               # Shared Fastify plugins (Swagger)
+├── db/
+│   ├── migrations/            # SQL schema migrations
+│   └── seed.ts                # Development admin seed
+├── __tests__/                 # Automated tests
+├── utils/test/                # Test setup and database helpers
+├── app.ts                     # Fastify app and module registration
+└── server.ts                  # HTTP server entry point
 ```
 
-### Member personal information (initial module scope)
+Feature-specific routes, data access, types, and validation live together in
+their module. Shared infrastructure belongs under `src/shared/`.
 
-The admin-only member endpoints currently cover personal information from the
-registration form:
+## Development commands
 
-```
-POST   /members           # Create a member profile
-GET    /members           # List profiles (paginated)
-GET    /members/:id       # Get one profile
-PATCH  /members/:id       # Update personal information
-```
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the server with TypeScript watch mode |
+| `npm run build` | Compile and type-check the project |
+| `npm test` | Run the test suite |
+| `npm run test:watch` | Run tests in watch mode |
+| `npm run test:coverage` | Run tests with coverage |
+| `npm run test:ui` | Open the Vitest UI |
+| `npm run db:migrate` | Apply database migrations |
+| `npm run db:seed` | Insert development admin users (destructive to existing users) |
 
-Address, family/financial, KYC, nominee, bank, assignment, and approval details
-are intentionally left for later module steps.
+## Security and production notes
 
-## 🔐 Session Configuration
+This project is under active development and is not production-ready. Before
+using it with real member data:
 
-- **Duration**: 24 hours
-- **Cookie**: HTTP-only, Secure (HTTPS in production)
-- **CSRF Protection**: SameSite=Lax
-- **Storage**: Server-side (in-memory)
+- Replace the development session-secret fallback with a required,
+  high-entropy secret; never use the fallback in production.
+- Restrict CORS to trusted frontend origins.
+- Replace SHA-256 password hashing with a password-specific hashing algorithm
+  such as Argon2id or bcrypt.
+- Review staff authorization and session invalidation behavior.
+- Establish access controls, retention, consent, encryption, and audit
+  requirements for member personal data.
+- Configure and securely back up `MEMBER_DATA_ENCRYPTION_KEY`; establish a key
+  rotation and recovery procedure before storing real member records.
+- Do not log passwords, identity documents, or other sensitive member data.
+- Do not use the development seed script with real data.
 
-## 📝 API Examples
+Member photographs and supporting documents are stored privately in S3, while
+the database stores only their object keys. Sensitive identity, nominee
+identity, and bank account numbers are encrypted with AES-256-GCM at rest and
+returned in masked form. Aadhaar biometrics and OTPs are not collected.
 
-### Register User
-
-```bash
-curl -X POST http://localhost:3000/auth/register \
-  -H "Content-Type: application/json" \
-  -d '{
-    "email": "user@example.com",
-    "name": "John Doe",
-    "password": "password123"
-  }'
-```
-
-### Login
-
-```bash
-curl -X POST http://localhost:3000/auth/login \
-  -H "Content-Type: application/json" \
-  -c cookies.txt \
-  -d '{
-    "email": "user@example.com",
-    "password": "password123"
-  }'
-```
-
-### Get Current User
-
-```bash
-curl -X GET http://localhost:3000/auth/me \
-  -b cookies.txt
-```
-
-### Logout
-
-```bash
-curl -X POST http://localhost:3000/auth/logout \
-  -b cookies.txt
-```
-
-## 🔒 Security Features
-
-✅ Session-based authentication  
-✅ HTTP-only cookies  
-✅ CSRF protection (SameSite cookies)  
-✅ Password hashing (SHA-256)  
-✅ Input validation (Zod)  
-✅ Secure session timeout  
-
-## 📚 Development Workflow
-
-1. **Start dev server**: `npm run dev`
-2. **Write code** in `src/`
-3. **Run tests**: `npm test`
-4. **View API docs**: http://localhost:3000/docs
-5. **Build for production**: `npm run build`
-
-## 🚢 Production Deployment
-
-Before deploying:
-
-- [ ] Set `NODE_ENV=production`
-- [ ] Update `SESSION_SECRET` to a strong random string
-- [ ] Enable HTTPS/TLS
-- [ ] Update database credentials
-- [ ] Consider Redis for distributed sessions
-- [ ] Enable CORS if needed
-- [ ] Set up monitoring and logging
-
-## 📖 Documentation
-
-- **README.md** - This file (overview and quick start)
-- **Swagger UI** - Full API documentation at `/docs`
-
-## 🤝 License
+## License
 
 ISC
-
-## 🎯 Next Steps
-
-- Add email verification
-- Add password reset flow
-- Add 2FA support
-- Add Redis session store
-- Add rate limiting
-- Add audit logging
-
----
-
-**Ready to get started?** Run `npm run dev` and visit http://localhost:3000/docs

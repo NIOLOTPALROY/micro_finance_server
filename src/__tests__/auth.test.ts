@@ -1,7 +1,9 @@
-import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
 import request from 'supertest';
+import { createHash } from 'crypto';
 import { getTestApp } from '../utils/test/setup';
 import { cleanupDatabase, seedDatabase } from '../utils/test/db';
+import { AuthUserRepository } from '../modules/auth/auth.repository';
 
 function getSessionCookie(response: { headers: Record<string, string | string[] | undefined> }): string {
   const cookie = response.headers['set-cookie'];
@@ -64,6 +66,34 @@ describe('Auth Functionality', () => {
 
     expect(res.status).toBe(401);
     expect(res.body).toHaveProperty('error', 'Invalid email or password');
+  });
+
+  it('should prevent an inactive member from logging in', async () => {
+    const email = 'inactive-member@example.com';
+    const findByEmail = vi
+      .spyOn(AuthUserRepository, 'findByEmail')
+      .mockResolvedValue({
+        id: '00000000-0000-4000-8000-000000000003',
+        email,
+        name: 'Inactive Member',
+        password_hash: createHash('sha256').update('password123').digest('hex'),
+        role: 'member',
+        member_status: 'inactive',
+        created_at: new Date(),
+        updated_at: new Date(),
+      });
+
+    try {
+      const response = await request(app.server)
+        .post('/auth/login')
+        .send({ email, password: 'password123' });
+
+      expect(findByEmail).toHaveBeenCalledWith(email);
+      expect(response.status).toBe(401);
+      expect(response.body).toHaveProperty('error', 'Invalid email or password');
+    } finally {
+      findByEmail.mockRestore();
+    }
   });
 
   it('should get current authenticated user', async () => {

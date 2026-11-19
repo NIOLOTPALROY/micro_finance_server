@@ -3,9 +3,11 @@ export interface LoginBody {
   password: string;
 }
 
+export type UserRole = "admin" | "member" | "lender";
+
 export interface AuthUser {
   id: string;
   email: string;
   name: string;
-  role: "admin" | "borrower" | "lender";
+  role: UserRole;
 }

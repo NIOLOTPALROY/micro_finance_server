@@ -48,7 +48,12 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       const { email, password } = req.body;
       const user = await AuthUserRepository.findByEmail(email);
 
-      if (!user) {
+      if (
+        !user ||
+        !user.email ||
+        !user.password_hash ||
+        (user.role === "member" && user.member_status === "inactive")
+      ) {
         return reply
           .status(401)
           .send({ error: "Invalid email or password" });

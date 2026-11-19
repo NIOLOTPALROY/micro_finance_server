@@ -1,11 +1,13 @@
 import { pool } from "../../shared/database/pool";
+import type { UserRole } from "./auth.types";
 
 export interface User {
   id: string;
-  email: string;
+  email: string | null;
   name: string;
-  password_hash: string;
-  role: "admin" | "borrower" | "lender";
+  password_hash: string | null;
+  role: UserRole;
+  member_status?: string | null;
   created_at: Date;
   updated_at: Date;
 }
