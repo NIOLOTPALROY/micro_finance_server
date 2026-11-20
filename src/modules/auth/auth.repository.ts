@@ -8,6 +8,7 @@ export interface User {
   password_hash: string | null;
   role: UserRole;
   member_status?: string | null;
+  employee_status?: string | null;
   created_at: Date;
   updated_at: Date;
 }
@@ -27,5 +28,19 @@ export class AuthUserRepository {
       [id]
     );
     return result.rows[0] as User | undefined;
+  }
+
+  static async findEmployeePermissions(id: string): Promise<string[]> {
+    const result = await pool.query<{ permission: string }>(
+      `SELECT ep.permission
+       FROM users AS u
+       JOIN employee_permissions AS ep ON ep.employee_id = u.id
+       WHERE u.id = $1
+         AND u.role = 'employee'
+         AND u.employee_status = 'active'
+       ORDER BY ep.permission`,
+      [id],
+    );
+    return result.rows.map((row) => row.permission);
   }
 }

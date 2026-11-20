@@ -1,5 +1,5 @@
 import type { FastifyInstance } from "fastify";
-import { requireRole } from "../auth/auth.middleware";
+import { requirePermission } from "../auth/auth.middleware";
 import {
   closeMemberFileStorage,
   createMemberFileDownload,
@@ -58,7 +58,7 @@ export async function memberRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: MemberFileUploadBody }>(
     "/members/files/upload",
     {
-      preHandler: requireRole("admin"),
+      preHandler: requirePermission("member_files.upload"),
       schema: {
         summary: "Request a member file upload",
         description:
@@ -77,7 +77,7 @@ export async function memberRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: MemberIdParams; Querystring: MemberFileDownloadQuery }>(
     "/members/:id/files/download",
     {
-      preHandler: requireRole("admin"),
+      preHandler: requirePermission("member_files.download"),
       schema: {
         summary: "Request a member file download",
         description:
@@ -110,7 +110,7 @@ export async function memberRoutes(app: FastifyInstance): Promise<void> {
   app.post<{ Body: CreateMemberInput }>(
     "/members",
     {
-      preHandler: requireRole("admin"),
+      preHandler: requirePermission("members.create"),
       schema: {
         summary: "Register a member",
         description:
@@ -141,7 +141,7 @@ export async function memberRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Querystring: MemberListQuery }>(
     "/members",
     {
-      preHandler: requireRole("admin"),
+      preHandler: requirePermission("members.read"),
       schema: {
         summary: "List members",
         tags: ["Member management"],
@@ -166,7 +166,7 @@ export async function memberRoutes(app: FastifyInstance): Promise<void> {
   app.get<{ Params: MemberIdParams }>(
     "/members/:id",
     {
-      preHandler: requireRole("admin"),
+      preHandler: requirePermission("members.read"),
       schema: {
         summary: "Get a member",
         tags: ["Member management"],
@@ -186,7 +186,7 @@ export async function memberRoutes(app: FastifyInstance): Promise<void> {
   app.delete<{ Params: MemberIdParams }>(
     "/members/:id",
     {
-      preHandler: requireRole("admin"),
+      preHandler: requirePermission("members.deactivate"),
       schema: {
         summary: "Deactivate a member",
         description:
@@ -229,7 +229,7 @@ export async function memberRoutes(app: FastifyInstance): Promise<void> {
   app.patch<{ Params: MemberIdParams; Body: UpdateMemberInput }>(
     "/members/:id",
     {
-      preHandler: requireRole("admin"),
+      preHandler: requirePermission("members.update"),
       schema: {
         summary: "Update a member",
         description:

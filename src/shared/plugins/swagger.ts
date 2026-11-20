@@ -13,6 +13,16 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
       },
       tags: [
         {
+          name: "Branch management",
+          description:
+            "Admin-managed branch records and default branch configuration.",
+        },
+        {
+          name: "Employee management",
+          description:
+            "Admin-managed employee accounts and individual permission assignments.",
+        },
+        {
           name: "Member management",
           description:
             "Member registration and private member file operations.",

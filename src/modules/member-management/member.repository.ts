@@ -568,16 +568,20 @@ async function getDefaultBranchId(
 ): Promise<string> {
   const result = branchId
     ? await client.query<{ id: string }>(
-        "SELECT id FROM branches WHERE id = $1",
+      `SELECT id FROM branches
+       WHERE id = $1 AND is_active = TRUE
+       FOR SHARE`,
         [branchId],
       )
     : await client.query<{ id: string }>(
-        "SELECT id FROM branches WHERE is_default = TRUE",
+      `SELECT id FROM branches
+       WHERE is_default = TRUE AND is_active = TRUE
+       FOR SHARE`,
       );
   const id = result.rows[0]?.id;
   if (!id) {
     const error = new Error(
-      branchId ? "Branch not found" : "Default branch is not configured",
+      branchId ? "Active branch not found" : "Active default branch is not configured",
     );
     Object.assign(error, { statusCode: branchId ? 400 : 500 });
     throw error;

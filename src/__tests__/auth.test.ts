@@ -96,6 +96,55 @@ describe('Auth Functionality', () => {
     }
   });
 
+  it('should return current permissions for an active employee', async () => {
+    const email = 'employee@example.com';
+    const user = {
+      id: '00000000-0000-4000-8000-000000000003',
+      email,
+      name: 'Employee User',
+      password_hash: createHash('sha256').update('password123').digest('hex'),
+      role: 'employee' as const,
+      employee_status: 'active',
+      created_at: new Date(),
+      updated_at: new Date(),
+    };
+    const findByEmail = vi
+      .spyOn(AuthUserRepository, 'findByEmail')
+      .mockResolvedValue(user);
+    const findById = vi
+      .spyOn(AuthUserRepository, 'findById')
+      .mockResolvedValue(user);
+    const findPermissions = vi
+      .spyOn(AuthUserRepository, 'findEmployeePermissions')
+      .mockResolvedValue(['members.read', 'members.update']);
+
+    try {
+      const login = await request(app.server)
+        .post('/auth/login')
+        .send({ email, password: 'password123' });
+
+      expect(login.status).toBe(200);
+      expect(login.body.user.permissions).toEqual([
+        'members.read',
+        'members.update',
+      ]);
+
+      const me = await request(app.server)
+        .get('/auth/me')
+        .set('Cookie', getSessionCookie(login));
+      expect(me.status).toBe(200);
+      expect(me.body.user.permissions).toEqual([
+        'members.read',
+        'members.update',
+      ]);
+      expect(findPermissions).toHaveBeenCalledTimes(2);
+    } finally {
+      findByEmail.mockRestore();
+      findById.mockRestore();
+      findPermissions.mockRestore();
+    }
+  });
+
   it('should get current authenticated user', async () => {
     const admin = { email: 'admin1@example.com', password: 'password123' };
 

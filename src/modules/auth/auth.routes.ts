@@ -31,6 +31,10 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
                   email: { type: "string" },
                   name: { type: "string" },
                   role: { type: "string" },
+                  permissions: {
+                    type: "array",
+                    items: { type: "string" },
+                  },
                 },
               },
             },
@@ -52,7 +56,8 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         !user ||
         !user.email ||
         !user.password_hash ||
-        (user.role === "member" && user.member_status === "inactive")
+        (user.role === "member" && user.member_status === "inactive") ||
+        (user.role === "employee" && user.employee_status !== "active")
       ) {
         return reply
           .status(401)
@@ -69,6 +74,11 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           .send({ error: "Invalid email or password" });
       }
 
+      const permissions =
+        user.role === "employee"
+          ? await AuthUserRepository.findEmployeePermissions(user.id)
+          : [];
+
       req.session.userId = user.id;
       req.session.email = user.email;
       req.session.name = user.name;
@@ -81,6 +91,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           email: user.email,
           name: user.name,
           role: user.role,
+          permissions,
         },
       });
     }
@@ -91,12 +102,25 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
       return reply.status(401).send({ error: "Not authenticated" });
     }
 
+    const user = await AuthUserRepository.findById(req.session.userId);
+    if (
+      !user ||
+      (user.role === "employee" && user.employee_status !== "active")
+    ) {
+      return reply.status(401).send({ error: "Not authenticated" });
+    }
+
+    const permissions =
+      user.role === "employee"
+        ? await AuthUserRepository.findEmployeePermissions(user.id)
+        : [];
     return reply.send({
       user: {
-        id: req.session.userId,
-        email: req.session.email,
-        name: req.session.name,
-        role: req.session.role,
+        id: user.id,
+        email: user.email,
+        name: user.name,
+        role: user.role,
+        permissions,
       },
     });
   });

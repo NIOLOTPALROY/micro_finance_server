@@ -9,6 +9,10 @@ onboarding and future lending workflows can grow independently.
 The backend currently provides:
 
 - **Authentication** for staff and member users using cookie-based sessions.
+- **Employee management** for admin-created employee accounts with individual
+  permissions for member and member-file operations.
+- **Branch management** for maintaining active branches and the default
+  registration branch.
 - **Member registration** covering personal, address, family/financial, KYC,
   nominee, bank, branch assignment, verification/consent, and internal review
   information.
@@ -24,8 +28,8 @@ address, family/financial, KYC, nominee, bank, and other registration sections
 are stored in their own related tables rather than on the account row or in a
 separate `members` table. Newly registered members do not have login credentials
 until they are activated.
-Member records are assigned to the seeded default branch named
-**Microfinance**; additional branch administration is not implemented yet.
+Member records are assigned to the active default branch named
+**Microfinance**, or to another active branch selected during registration.
 
 ## Technology
 
@@ -42,6 +46,7 @@ Member records are assigned to the seeded default branch named
 
 - Node.js and npm
 - PostgreSQL
+- Docker with Docker Compose (for the containerized setup)
 
 ## Getting started
 
@@ -99,6 +104,37 @@ Member records are assigned to the seeded default branch named
 
 The service runs at `http://localhost:3000`. Browse the API reference and
 interactive documentation at `http://localhost:3000/docs`.
+
+## Run with Docker Compose
+
+1. Copy `.env.example` to `.env` and set the session secret, member data
+   encryption key, and S3 settings as described above.
+2. Build and start the API and its PostgreSQL database:
+
+   ```bash
+   docker compose up --build
+   ```
+
+   Compose waits for PostgreSQL, applies pending migrations to the Compose
+   database, and then starts the API. The database is persisted in the
+   `postgres_data` volume. The API is available at
+   `http://localhost:${APP_PORT:-3000}` and Swagger UI at `/docs`.
+
+   Set `APP_PORT` in `.env` to change the host port. `PG_HOST` is set to the
+   Compose database service inside the container.
+
+3. Stop the services while retaining database data:
+
+   ```bash
+   docker compose down
+   ```
+
+   Removing the `postgres_data` volume also deletes the database and all data
+   stored in it.
+
+Do not commit `.env` or include credentials in a container image. For
+production, use managed PostgreSQL, provide AWS credentials through an IAM
+role, and configure HTTPS and a strong `SESSION_SECRET`.
 
 ## Configuration
 
@@ -174,6 +210,10 @@ Migrations are in `src/db/migrations/`:
    changes the `borrower` role to `member`, and re-keys member sections to users.
 7. `007_separate_member_personal_information.sql` — moves member personal
    information out of `users` into its own related table.
+8. `008_add_employee_management.sql` — adds employee accounts, active status,
+   and per-employee permission assignments.
+9. `009_add_branch_management.sql` — adds branch active status and update
+   timestamps for branch administration.
 
 Run migrations with:
 
@@ -197,6 +237,8 @@ containing real users or production data.
 src/
 ├── modules/
 │   ├── auth/                  # Authentication and authorization
+│   ├── branch-management/     # Branch records and default branch
+│   ├── employee-management/   # Staff accounts and employee permissions
 │   ├── health/                # Service health checks
 │   └── member-management/     # Member onboarding
 ├── shared/
@@ -213,6 +255,12 @@ src/
 
 Feature-specific routes, data access, types, and validation live together in
 their module. Shared infrastructure belongs under `src/shared/`.
+
+Employee permission grants are stored in `employee_permissions`. Supported
+permissions are `members.read`, `members.create`, `members.update`,
+`members.deactivate`, `member_files.upload`, and `member_files.download`.
+Administrators bypass these grants; employee access is checked against the
+current database grants on each request.
 
 ## Development commands
 

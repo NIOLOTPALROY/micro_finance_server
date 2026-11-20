@@ -5,6 +5,8 @@ import fastifyCookie from "@fastify/cookie";
 import fastifyCors from "@fastify/cors";
 import { registerAuthModule } from "./modules/auth";
 import { registerHealthModule } from "./modules/health";
+import { registerEmployeeManagementModule } from "./modules/employee-management";
+import { registerBranchManagementModule } from "./modules/branch-management/index.js";
 import { registerMemberManagementModule } from "./modules/member-management";
 import { registerSwagger } from "./shared/plugins/swagger";
 
@@ -58,6 +60,8 @@ export async function buildApp() {
   await registerAuthModule(app);
   await registerHealthModule(app);
   await registerMemberManagementModule(app);
+  await registerEmployeeManagementModule(app);
+  await registerBranchManagementModule(app);
 
   return app;
 }

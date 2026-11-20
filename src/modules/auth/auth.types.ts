@@ -3,7 +3,7 @@ export interface LoginBody {
   password: string;
 }
 
-export type UserRole = "admin" | "member" | "lender";
+export type UserRole = "admin" | "employee" | "member" | "lender";
 
 export interface AuthUser {
   id: string;
