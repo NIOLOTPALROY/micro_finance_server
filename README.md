@@ -13,6 +13,9 @@ The backend currently provides:
   permissions for member and member-file operations.
 - **Branch management** for maintaining active branches and the default
   registration branch.
+- **Member assessment** groundwork for consent-gated credit bureau checks.
+  The check API currently records an unavailable attempt; it does not retrieve
+  or invent a score until a bureau provider/API is configured.
 - **Member registration** covering personal, address, family/financial, KYC,
   nominee, bank, branch assignment, verification/consent, and internal review
   information.
@@ -30,6 +33,21 @@ separate `members` table. Newly registered members do not have login credentials
 until they are activated.
 Member records are assigned to the active default branch named
 **Microfinance**, or to another active branch selected during registration.
+
+## Member assessment
+
+The `member-assessment` module currently provides:
+
+- `POST /members/:memberId/credit-checks` to record a consent-gated attempt.
+- `GET /members/:memberId/credit-checks` to review attempts and completed
+  scores.
+
+The bureau/provider API has not been selected or configured yet. Until its
+integration is added, a request records `provider_not_configured` and responds
+with HTTP 503; no provider is contacted and no score is produced. Check scores
+will be encrypted at rest using `MEMBER_DATA_ENCRYPTION_KEY`. Employees need
+the `member_assessment.credit_check` permission; administrators bypass employee
+permissions. Apply migration 010 before using the endpoints.
 
 ## Technology
 
@@ -70,7 +88,7 @@ Member records are assigned to the active default branch named
    cp .env.example .env
    ```
 
-   Update `.env` with the PostgreSQL connection details, a strong,
+   Update `.env` with your PostgreSQL `DATABASE_URL`, a strong,
    unpredictable `SESSION_SECRET`, a random 32-byte
    `MEMBER_DATA_ENCRYPTION_KEY`, and the S3 bucket and region. Generate the
    encryption key with:
@@ -85,14 +103,9 @@ Member records are assigned to the active default branch named
    production; for local development, provide AWS credentials through your
    local environment or AWS profile.
 
-4. Apply migrations. The migration configuration reads `PG_*` variables from
-   the current shell environment. In Bash or Zsh, load the values from `.env`
-   before running the migration:
+4. Apply migrations. The migration tool loads `DATABASE_URL` from `.env`:
 
    ```bash
-   set -a
-   source .env
-   set +a
    npm run db:migrate
    ```
 
@@ -109,42 +122,40 @@ interactive documentation at `http://localhost:3000/docs`.
 
 1. Copy `.env.example` to `.env` and set the session secret, member data
    encryption key, and S3 settings as described above.
-2. Build and start the API and its PostgreSQL database:
+2. Build and start the API:
 
    ```bash
    docker compose up --build
    ```
 
-   Compose waits for PostgreSQL, applies pending migrations to the Compose
-   database, and then starts the API. The database is persisted in the
-   `postgres_data` volume. The API is available at
+   Compose applies pending migrations to the database referenced by
+   `DATABASE_URL`, then starts the API. The API is available at
    `http://localhost:${APP_PORT:-3000}` and Swagger UI at `/docs`.
 
-   Set `APP_PORT` in `.env` to change the host port. `PG_HOST` is set to the
-   Compose database service inside the container.
+   Set `APP_PORT` in `.env` to change the host port. The database URL must be
+   reachable from inside the container. For a database running on your
+   computer, use `host.docker.internal` instead of `localhost` in the URL.
 
-3. Stop the services while retaining database data:
+3. Stop the API container:
 
    ```bash
    docker compose down
    ```
 
-   Removing the `postgres_data` volume also deletes the database and all data
-   stored in it.
+   Compose does not create or delete the external database.
 
 Do not commit `.env` or include credentials in a container image. For
 production, use managed PostgreSQL, provide AWS credentials through an IAM
 role, and configure HTTPS and a strong `SESSION_SECRET`.
 
+For a step-by-step guide to GitHub Actions CI, Docker image publishing, and
+staged deployment, see [CI/CD Guidelines](./docs/cicd-guidelines.md).
+
 ## Configuration
 
 | Variable | Description | Default |
 | --- | --- | --- |
-| `PG_HOST` | PostgreSQL server host | `localhost` |
-| `PG_PORT` | PostgreSQL server port | `5432` |
-| `PG_DATABASE` | Database name | `micro_finance` |
-| `PG_USER` | Database user | `postgres` |
-| `PG_PASSWORD` | Database password | `postgres` |
+| `DATABASE_URL` | Full PostgreSQL connection string, including host, port, database, and credentials | Required |
 | `SESSION_SECRET` | Secret used to sign session cookies | Development fallback |
 | `MEMBER_DATA_ENCRYPTION_KEY` | 32-byte hex key for sensitive member data | Required for sensitive data |
 | `AWS_REGION` | AWS region containing the S3 bucket | Required for S3 file storage |
@@ -159,9 +170,8 @@ role, and configure HTTPS and a strong `SESSION_SECRET`.
 | `HOST` | Address to bind the server to | `0.0.0.0` |
 | `NODE_ENV` | Runtime environment | `development` |
 
-The application loads `.env` when starting the server and when running the
-seed script. Database migrations use the `PG_*` variables in the shell
-environment, as shown above.
+The application and migration tool load `DATABASE_URL` from `.env`. In CI and
+deployment, provide it as an environment variable or secret.
 
 ## AWS S3 setup
 
@@ -214,6 +224,8 @@ Migrations are in `src/db/migrations/`:
    and per-employee permission assignments.
 9. `009_add_branch_management.sql` — adds branch active status and update
    timestamps for branch administration.
+10. `010_add_member_credit_bureau_checks.sql` — adds credit-check history and
+    the employee credit-check permission.
 
 Run migrations with:
 
@@ -240,6 +252,7 @@ src/
 │   ├── branch-management/     # Branch records and default branch
 │   ├── employee-management/   # Staff accounts and employee permissions
 │   ├── health/                # Service health checks
+│   ├── member-assessment/     # Credit bureau checks and future assessments
 │   └── member-management/     # Member onboarding
 ├── shared/
 │   ├── database/              # Shared PostgreSQL pool
@@ -259,6 +272,7 @@ their module. Shared infrastructure belongs under `src/shared/`.
 Employee permission grants are stored in `employee_permissions`. Supported
 permissions are `members.read`, `members.create`, `members.update`,
 `members.deactivate`, `member_files.upload`, and `member_files.download`.
+The member-assessment module adds `member_assessment.credit_check`.
 Administrators bypass these grants; employee access is checked against the
 current database grants on each request.
 

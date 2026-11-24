@@ -17,7 +17,6 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
-COPY pgmigrations.cjs ./
 COPY --from=build /app/dist/server.js ./dist/server.js
 COPY --from=build /app/src/db/migrations ./src/db/migrations
 

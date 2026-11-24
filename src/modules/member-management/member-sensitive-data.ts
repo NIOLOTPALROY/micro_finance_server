@@ -11,6 +11,7 @@ export const SENSITIVE_MEMBER_FIELDS = [
   "voter_id",
   "nominee_identity_proof",
   "bank_account_number",
+  "credit_bureau_score",
 ] as const;
 
 export type SensitiveMemberField = (typeof SENSITIVE_MEMBER_FIELDS)[number];

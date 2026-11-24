@@ -1,6 +1,9 @@
 /**
  * Test data generators and API helper functions.
  * Use these to create consistent test data and make API calls.
+ *
+ * Note: Loan and repayment-related helpers have been removed as there is no loans/repayments
+ * module currently in the codebase. These will be added back when that feature is implemented.
  */
 
 import type { FastifyInstance } from 'fastify';
@@ -19,30 +22,12 @@ export function generateTestUser(overrides?: Record<string, unknown>) {
     };
 }
 
-export function generateTestLoan(borrowerId: string, overrides?: Record<string, unknown>) {
-    return {
-        borrower_id: borrowerId,
-        amount: 100000,
-        interest_rate: 5.5,
-        term_months: 12,
-        ...overrides,
-    };
-}
-
-export function generateTestRepayment(loanId: string, overrides?: Record<string, unknown>) {
-    const dueDate = new Date();
-    dueDate.setMonth(dueDate.getMonth() + 1);
-
-    return {
-        loan_id: loanId,
-        amount: 8500,
-        due_date: dueDate.toISOString(),
-        ...overrides,
-    };
-}
-
 /**
  * Helper to register a test user and get auth token.
+ *
+ * Note: This helper references POST /auth/register, but the auth module only provides
+ * login, me, and logout endpoints. Remove or update this helper when a registration
+ * endpoint is implemented.
  */
 export async function registerTestUser(
     app: FastifyInstance,
@@ -62,52 +47,4 @@ export async function registerTestUser(
         userId: response.body.user.id,
         user: response.body.user,
     };
-}
-
-/**
- * Helper to create a test loan.
- */
-export async function createTestLoan(
-    app: FastifyInstance,
-    token: string,
-    borrowerId: string,
-    loanOverrides?: Record<string, unknown>
-): Promise<Record<string, unknown>> {
-    const request = (await import('supertest')).default;
-    const loanData = generateTestLoan(borrowerId, loanOverrides);
-
-    const response = await request(app.server)
-        .post('/loans')
-        .set('Authorization', `Bearer ${token}`)
-        .send(loanData);
-
-    if (response.status !== 201) {
-        throw new Error(`Failed to create test loan: ${response.status}`);
-    }
-
-    return response.body;
-}
-
-/**
- * Helper to create a test repayment.
- */
-export async function createTestRepayment(
-    app: FastifyInstance,
-    token: string,
-    loanId: string,
-    repaymentOverrides?: Record<string, unknown>
-): Promise<Record<string, unknown>> {
-    const request = (await import('supertest')).default;
-    const repaymentData = generateTestRepayment(loanId, repaymentOverrides);
-
-    const response = await request(app.server)
-        .post('/repayments')
-        .set('Authorization', `Bearer ${token}`)
-        .send(repaymentData);
-
-    if (response.status !== 201) {
-        throw new Error(`Failed to create test repayment: ${response.status}`);
-    }
-
-    return response.body;
 }

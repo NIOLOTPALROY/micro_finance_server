@@ -29,6 +29,15 @@ describe("member sensitive data encryption", () => {
     expect(maskSensitiveValue(data.bank_account_number)).toBe("********9012");
   });
 
+  it("encrypts credit bureau scores at rest", () => {
+    process.env.MEMBER_DATA_ENCRYPTION_KEY = "11".repeat(32);
+    const data = { credit_bureau_score: "750" };
+
+    const encrypted = encryptMemberSensitiveData(data);
+    expect(encrypted.ciphertext.toString("utf8")).not.toContain("750");
+    expect(decryptMemberSensitiveData(encrypted)).toEqual(data);
+  });
+
   it("requires a 32-byte encryption key", () => {
     delete process.env.MEMBER_DATA_ENCRYPTION_KEY;
 

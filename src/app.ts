@@ -8,6 +8,7 @@ import { registerHealthModule } from "./modules/health";
 import { registerEmployeeManagementModule } from "./modules/employee-management";
 import { registerBranchManagementModule } from "./modules/branch-management/index.js";
 import { registerMemberManagementModule } from "./modules/member-management";
+import { registerMemberAssessmentModule } from "./modules/member-assessment";
 import { registerSwagger } from "./shared/plugins/swagger";
 
 // Extend Fastify session with custom properties
@@ -60,6 +61,7 @@ export async function buildApp() {
   await registerAuthModule(app);
   await registerHealthModule(app);
   await registerMemberManagementModule(app);
+  await registerMemberAssessmentModule(app);
   await registerEmployeeManagementModule(app);
   await registerBranchManagementModule(app);
 

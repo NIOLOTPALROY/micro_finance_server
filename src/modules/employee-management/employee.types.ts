@@ -5,6 +5,7 @@ export const EMPLOYEE_PERMISSIONS = [
   "members.deactivate",
   "member_files.upload",
   "member_files.download",
+  "member_assessment.credit_check",
 ] as const;
 
 export type EmployeePermission = (typeof EMPLOYEE_PERMISSIONS)[number];
