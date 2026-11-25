@@ -59,19 +59,13 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
         (user.role === "member" && user.member_status === "inactive") ||
         (user.role === "employee" && user.employee_status !== "active")
       ) {
-        return reply
-          .status(401)
-          .send({ error: "Invalid email or password" });
+        return reply.status(401).send({ error: "Invalid email or password" });
       }
 
-      const passwordHash = createHash("sha256")
-        .update(password)
-        .digest("hex");
+      const passwordHash = createHash("sha256").update(password).digest("hex");
 
       if (passwordHash !== user.password_hash) {
-        return reply
-          .status(401)
-          .send({ error: "Invalid email or password" });
+        return reply.status(401).send({ error: "Invalid email or password" });
       }
 
       const permissions =
@@ -94,7 +88,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
           permissions,
         },
       });
-    }
+    },
   );
 
   app.get("/auth/me", async (req, reply) => {
@@ -126,11 +120,7 @@ export async function authRoutes(app: FastifyInstance): Promise<void> {
   });
 
   app.post("/auth/logout", async (req, reply) => {
-    req.session.destroy((error) => {
-      if (error) {
-        req.log.error(error, "Failed to destroy session");
-      }
-    });
+    await req.session.destroy();
 
     return reply.send({ message: "Logged out successfully" });
   });

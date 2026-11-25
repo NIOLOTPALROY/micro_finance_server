@@ -115,8 +115,8 @@ permissions. Apply migration 010 before using the endpoints.
    npm run dev
    ```
 
-The service runs at `http://localhost:3000`. Browse the API reference and
-interactive documentation at `http://localhost:3000/docs`.
+The development service runs at `http://localhost:3001`. Browse the API
+reference and interactive documentation at `http://localhost:3001/docs`.
 
 ## Run with Docker Compose
 
@@ -166,7 +166,7 @@ staged deployment, see [CI/CD Guidelines](./docs/cicd-guidelines.md).
 | `AWS_S3_DOWNLOAD_URL_TTL_SECONDS` | Lifetime of signed download URLs | `300` |
 | `AWS_S3_MAX_IMAGE_BYTES` | Maximum image size | `5242880` |
 | `AWS_S3_MAX_DOCUMENT_BYTES` | Maximum document size | `10485760` |
-| `PORT` | HTTP port | `3000` |
+| `PORT` | HTTP port | `3001` |
 | `HOST` | Address to bind the server to | `0.0.0.0` |
 | `NODE_ENV` | Runtime environment | `development` |
 
@@ -201,7 +201,7 @@ required in `.env` when the application runs with an IAM role.
 
 API endpoints, schemas, and examples are maintained in Swagger rather than
 duplicated in this README. Start the service and open
-`http://localhost:3000/docs` to view the current documentation.
+`http://localhost:3001/docs` to view the current documentation.
 
 ## Database
 
