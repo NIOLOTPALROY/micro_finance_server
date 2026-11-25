@@ -28,7 +28,7 @@ export async function registerSwagger(app: FastifyInstance): Promise<void> {
             "Member registration and private member file operations.",
         },
         {
-          name: "Member assessment",
+          name: "Member assessment (docs)",
           description:
             "Credit bureau check attempts and future member assessment sections.",
         },
