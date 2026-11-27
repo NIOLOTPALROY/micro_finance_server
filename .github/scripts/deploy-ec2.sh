@@ -4,7 +4,6 @@ set -euo pipefail
 app_dir="$HOME/.config/micro-finance-api"
 env_file="$app_dir/.env"
 container_name=micro-finance-api
-parameter_prefix=/micro-finance/prod
 
 mkdir -p "$app_dir"
 chmod 700 "$app_dir"
@@ -14,26 +13,7 @@ if [[ ! -f "$env_file" ]]; then
 fi
 chmod 600 "$env_file"
 
-ghcr_username="$(aws ssm get-parameter \
-  --name "$parameter_prefix/ghcr-username" \
-  --query 'Parameter.Value' \
-  --output text \
-  --region "$AWS_REGION")"
-ghcr_token="$(aws ssm get-parameter \
-  --name "$parameter_prefix/ghcr-read-token" \
-  --with-decryption \
-  --query 'Parameter.Value' \
-  --output text \
-  --region "$AWS_REGION")"
-
-printf '%s' "$ghcr_token" |
-  docker login ghcr.io --username "$ghcr_username" --password-stdin
-unset ghcr_token
-trap 'docker logout ghcr.io >/dev/null 2>&1 || true' EXIT
-
 docker pull "$APP_IMAGE"
-docker logout ghcr.io
-trap - EXIT
 
 docker run --rm \
   --env-file "$env_file" \
