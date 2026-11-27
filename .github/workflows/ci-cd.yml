@@ -115,7 +115,7 @@ jobs:
           labels: ${{ steps.metadata.outputs.labels }}
 
   deploy:
-    name: deploy to EC2(aws)
+    name: deploy to EC2
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     needs: publish
     runs-on: ubuntu-latest
