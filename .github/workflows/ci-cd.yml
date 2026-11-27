@@ -136,9 +136,9 @@ jobs:
           EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
         run: |
           set -euo pipefail
-          test -n "$AWS_REGION" || { echo "Set the AWS_REGION repository variable"; exit 1; }
-          test -n "$EC2_HOST" || { echo "Set the EC2_HOST repository variable"; exit 1; }
-          test -n "$EC2_USER" || { echo "Set the EC2_USER repository variable"; exit 1; }
+          test -n "$AWS_REGION" || { echo "Set the AWS_REGION repository secret"; exit 1; }
+          test -n "$EC2_HOST" || { echo "Set the EC2_HOST repository secret"; exit 1; }
+          test -n "$EC2_USER" || { echo "Set the EC2_USER repository secret"; exit 1; }
           test -n "$EC2_SSH_PRIVATE_KEY" || { echo "Set the EC2_SSH_PRIVATE_KEY repository secret"; exit 1; }
           test -n "$EC2_KNOWN_HOSTS" || { echo "Set the EC2_KNOWN_HOSTS repository secret"; exit 1; }
 

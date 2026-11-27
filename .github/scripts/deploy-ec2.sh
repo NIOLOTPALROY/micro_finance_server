@@ -8,12 +8,10 @@ parameter_prefix=/micro-finance/prod
 
 mkdir -p "$app_dir"
 chmod 700 "$app_dir"
-aws ssm get-parameter \
-  --name "$parameter_prefix/app-env" \
-  --with-decryption \
-  --query 'Parameter.Value' \
-  --output text \
-  --region "$AWS_REGION" > "$env_file"
+if [[ ! -f "$env_file" ]]; then
+  echo "Missing $env_file. Upload the production .env file before deploying." >&2
+  exit 1
+fi
 chmod 600 "$env_file"
 
 ghcr_username="$(aws ssm get-parameter \
