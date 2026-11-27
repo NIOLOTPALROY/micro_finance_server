@@ -30,12 +30,12 @@ describe("Branch management", () => {
 
   beforeAll(async () => {
     app = await buildApp();
-    app.post("/__tests__/admin-session", async (req, reply) => {
+    app.post("/api/__tests__/admin-session", async (req, reply) => {
       req.session.userId = "00000000-0000-4000-8000-000000000001";
       req.session.role = "admin";
       return reply.send({ message: "Test session created" });
     });
-    app.post("/__tests__/member-session", async (req, reply) => {
+    app.post("/api/__tests__/member-session", async (req, reply) => {
       req.session.userId = "00000000-0000-4000-8000-000000000002";
       req.session.role = "member";
       return reply.send({ message: "Test session created" });
@@ -54,29 +54,29 @@ describe("Branch management", () => {
         expect.objectContaining({ name: "Branch management" }),
       ]),
     );
-    expect(specification.paths?.["/branches"]?.post?.summary).toBe(
+    expect(specification.paths?.["/api/branches"]?.post?.summary).toBe(
       "Create a branch",
     );
-    expect(specification.paths?.["/branches"]?.get?.summary).toBe(
+    expect(specification.paths?.["/api/branches"]?.get?.summary).toBe(
       "List branches",
     );
-    expect(specification.paths?.["/branches/{id}"]?.patch?.summary).toBe(
+    expect(specification.paths?.["/api/branches/{id}"]?.patch?.summary).toBe(
       "Update a branch",
     );
-    expect(specification.paths?.["/branches/{id}"]?.delete?.description).toContain(
+    expect(specification.paths?.["/api/branches/{id}"]?.delete?.description).toContain(
       "default branch must be moved first",
     );
   });
 
   it("restricts branch administration to admins", async () => {
-    const unauthenticated = await request(app.server).get("/branches");
+    const unauthenticated = await request(app.server).get("/api/branches");
     expect(unauthenticated.status).toBe(401);
 
     const session = await request(app.server)
-      .post("/__tests__/member-session")
+      .post("/api/__tests__/member-session")
       .send();
     const forbidden = await request(app.server)
-      .get("/branches")
+      .get("/api/branches")
       .set("Cookie", sessionCookie(session));
     expect(forbidden.status).toBe(403);
   });
@@ -90,11 +90,11 @@ describe("Branch management", () => {
       .mockResolvedValue(true);
     try {
       const session = await request(app.server)
-        .post("/__tests__/admin-session")
+        .post("/api/__tests__/admin-session")
         .send();
       const cookie = sessionCookie(session);
       const created = await request(app.server)
-        .post("/branches")
+        .post("/api/branches")
         .set("Cookie", cookie)
         .send({ code: "north", name: "Northern Branch" });
       expect(created.status).toBe(201);
@@ -105,7 +105,7 @@ describe("Branch management", () => {
       });
 
       const deleted = await request(app.server)
-        .delete(`/branches/${branch.id}`)
+        .delete(`/api/branches/${branch.id}`)
         .set("Cookie", cookie);
       expect(deleted.status).toBe(204);
       expect(create).toHaveBeenCalledWith({
@@ -130,10 +130,10 @@ describe("Branch management", () => {
       );
     try {
       const session = await request(app.server)
-        .post("/__tests__/admin-session")
+        .post("/api/__tests__/admin-session")
         .send();
       const response = await request(app.server)
-        .delete(`/branches/${branch.id}`)
+        .delete(`/api/branches/${branch.id}`)
         .set("Cookie", sessionCookie(session));
       expect(response.status).toBe(409);
       expect(response.body.error).toContain(

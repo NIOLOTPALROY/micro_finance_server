@@ -14,7 +14,10 @@ describe('Health Check', () => {
   });
 
   it('should return health status', async () => {
-    const res = await request(app.server).get('/health');
+    const unprefixed = await request(app.server).get('/health');
+    expect(unprefixed.status).toBe(404);
+
+    const res = await request(app.server).get('/api/health');
 
     expect(res.status).toBe(200);
     expect(res.body).toHaveProperty('status', 'ok');

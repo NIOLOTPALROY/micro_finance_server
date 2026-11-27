@@ -11,7 +11,7 @@ async function start() {
     // eslint-disable-next-line no-console
     console.log(`🚀 Micro Finance API listening on http://${HOST}:${PORT}`);
     // eslint-disable-next-line no-console
-    console.log(`📚 Swagger UI available at http://${HOST}:${PORT}/docs`);
+    console.log(`📚 Swagger UI available at http://${HOST}:${PORT}/api/docs`);
   } catch (err) {
     // eslint-disable-next-line no-console
     console.error("Failed to start server:", err);

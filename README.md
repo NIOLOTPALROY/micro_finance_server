@@ -38,8 +38,8 @@ Member records are assigned to the active default branch named
 
 The `member-assessment` module currently provides:
 
-- `POST /members/:memberId/credit-checks` to record a consent-gated attempt.
-- `GET /members/:memberId/credit-checks` to review attempts and completed
+- `POST /api/members/:memberId/credit-checks` to record a consent-gated attempt.
+- `GET /api/members/:memberId/credit-checks` to review attempts and completed
   scores.
 
 The bureau/provider API has not been selected or configured yet. Until its
@@ -115,8 +115,9 @@ permissions. Apply migration 010 before using the endpoints.
    npm run dev
    ```
 
-The development service runs at `http://localhost:3001`. Browse the API
-reference and interactive documentation at `http://localhost:3001/docs`.
+The development service runs at `http://localhost:3001`. All API endpoints
+require the `/api` prefix. Browse the API reference and interactive
+documentation at `http://localhost:3001/api/docs`.
 
 ## Run with Docker Compose
 
@@ -130,7 +131,7 @@ reference and interactive documentation at `http://localhost:3001/docs`.
 
    Compose applies pending migrations to the database referenced by
    `DATABASE_URL`, then starts the API. The API is available at
-   `http://localhost:${APP_PORT:-3000}` and Swagger UI at `/docs`.
+   `http://localhost:${APP_PORT:-3000}` and Swagger UI at `/api/docs`.
 
    Set `APP_PORT` in `.env` to change the host port. The database URL must be
    reachable from inside the container. For a database running on your
@@ -201,7 +202,7 @@ required in `.env` when the application runs with an IAM role.
 
 API endpoints, schemas, and examples are maintained in Swagger rather than
 duplicated in this README. Start the service and open
-`http://localhost:3001/docs` to view the current documentation.
+`http://localhost:3001/api/docs` to view the current documentation.
 
 ## Database
 

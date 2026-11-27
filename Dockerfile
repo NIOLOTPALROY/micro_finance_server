@@ -23,6 +23,6 @@ COPY --from=build /app/src/db/migrations ./src/db/migrations
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "fetch('http://127.0.0.1:3000/health').then(async (r) => { const body = await r.json(); if (!r.ok || body.database !== 'ok') process.exit(1); }).catch(() => process.exit(1))"
+  CMD node -e "fetch('http://127.0.0.1:3000/api/health').then(async (r) => { const body = await r.json(); if (!r.ok || body.database !== 'ok') process.exit(1); }).catch(() => process.exit(1))"
 
 CMD ["npm", "start"]

@@ -30,7 +30,7 @@ describe('Auth Functionality', () => {
     ];
 
     for (const admin of adminUsers) {
-      const res = await request(app.server).post('/auth/login').send(admin);
+      const res = await request(app.server).post('/api/auth/login').send(admin);
 
       expect(res.status).toBe(200);
       expect(res.body).toHaveProperty('message', 'Logged in successfully');
@@ -42,7 +42,7 @@ describe('Auth Functionality', () => {
 
   it('should prevent login with invalid credentials', async () => {
     const res = await request(app.server)
-      .post('/auth/login')
+      .post('/api/auth/login')
       .send({
         email: 'admin1@example.com',
         password: 'wrongpassword',
@@ -54,7 +54,7 @@ describe('Auth Functionality', () => {
 
   it('should prevent login for non-existent user', async () => {
     const res = await request(app.server)
-      .post('/auth/login')
+      .post('/api/auth/login')
       .send({
         email: 'nonexistent@example.com',
         password: 'password123',
@@ -81,7 +81,7 @@ describe('Auth Functionality', () => {
 
     try {
       const response = await request(app.server)
-        .post('/auth/login')
+        .post('/api/auth/login')
         .send({ email, password: 'password123' });
 
       expect(findByEmail).toHaveBeenCalledWith(email);
@@ -116,7 +116,7 @@ describe('Auth Functionality', () => {
 
     try {
       const login = await request(app.server)
-        .post('/auth/login')
+        .post('/api/auth/login')
         .send({ email, password: 'password123' });
 
       expect(login.status).toBe(200);
@@ -126,7 +126,7 @@ describe('Auth Functionality', () => {
       ]);
 
       const me = await request(app.server)
-        .get('/auth/me')
+        .get('/api/auth/me')
         .set('Cookie', getSessionCookie(login));
       expect(me.status).toBe(200);
       expect(me.body.user.permissions).toEqual([
@@ -144,11 +144,11 @@ describe('Auth Functionality', () => {
   it('should get current authenticated user', async () => {
     const admin = { email: 'admin1@example.com', password: 'password123' };
 
-    const loginRes = await request(app.server).post('/auth/login').send(admin);
+    const loginRes = await request(app.server).post('/api/auth/login').send(admin);
     const cookie = getSessionCookie(loginRes);
 
     const meRes = await request(app.server)
-      .get('/auth/me')
+      .get('/api/auth/me')
       .set('Cookie', cookie);
 
     expect(meRes.status).toBe(200);
@@ -160,16 +160,16 @@ describe('Auth Functionality', () => {
   it('should logout an authenticated user', async () => {
     const admin = { email: 'admin1@example.com', password: 'password123' };
 
-    const loginRes = await request(app.server).post('/auth/login').send(admin);
+    const loginRes = await request(app.server).post('/api/auth/login').send(admin);
     const cookie = getSessionCookie(loginRes);
 
-    const logoutRes = await request(app.server).post('/auth/logout').set('Cookie', cookie);
+    const logoutRes = await request(app.server).post('/api/auth/logout').set('Cookie', cookie);
 
     expect(logoutRes.status).toBe(200);
     expect(logoutRes.body).toHaveProperty('message', 'Logged out successfully');
 
     const meRes = await request(app.server)
-      .get('/auth/me')
+      .get('/api/auth/me')
       .set('Cookie', cookie);
 
     expect(meRes.status).toBe(401);

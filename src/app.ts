@@ -57,13 +57,17 @@ export async function buildApp() {
   // Register Swagger (OpenAPI docs)
   await registerSwagger(app);
 
-  // Register feature modules
-  await registerAuthModule(app);
-  await registerHealthModule(app);
-  await registerMemberManagementModule(app);
-  await registerMemberAssessmentModule(app);
-  await registerEmployeeManagementModule(app);
-  await registerBranchManagementModule(app);
+  await app.register(
+    async (api) => {
+      await registerAuthModule(api);
+      await registerHealthModule(api);
+      await registerMemberManagementModule(api);
+      await registerMemberAssessmentModule(api);
+      await registerEmployeeManagementModule(api);
+      await registerBranchManagementModule(api);
+    },
+    { prefix: "/api" },
+  );
 
   return app;
 }
