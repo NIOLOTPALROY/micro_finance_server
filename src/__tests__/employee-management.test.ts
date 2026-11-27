@@ -29,18 +29,18 @@ describe("Employee management", () => {
 
   beforeAll(async () => {
     app = await buildApp();
-    app.post("/__tests__/admin-session", async (req, reply) => {
+    app.post("/api/__tests__/admin-session", async (req, reply) => {
       req.session.userId = "00000000-0000-4000-8000-000000000001";
       req.session.role = "admin";
       return reply.send({ message: "Test session created" });
     });
-    app.post("/__tests__/employee-session", async (req, reply) => {
+    app.post("/api/__tests__/employee-session", async (req, reply) => {
       req.session.userId = employee.id;
       req.session.role = "employee";
       return reply.send({ message: "Test session created" });
     });
     app.get(
-      "/__tests__/member-read",
+      "/api/__tests__/member-read",
       { preHandler: requirePermission("members.read") },
       async (_req, reply) => reply.send({ allowed: true }),
     );
@@ -58,14 +58,14 @@ describe("Employee management", () => {
         expect.objectContaining({ name: "Employee management" }),
       ]),
     );
-    expect(specification.paths?.["/employees"]?.post?.summary).toBe(
+    expect(specification.paths?.["/api/employees"]?.post?.summary).toBe(
       "Create an employee",
     );
-    expect(specification.paths?.["/employees/{id}"]?.patch?.summary).toBe(
+    expect(specification.paths?.["/api/employees/{id}"]?.patch?.summary).toBe(
       "Update an employee",
     );
     const createOperation = JSON.stringify(
-      specification.paths?.["/employees"]?.post ?? {},
+      specification.paths?.["/api/employees"]?.post ?? {},
     );
     expect(createOperation).toContain("members.read");
     expect(createOperation).toContain("member_files.upload");
@@ -73,7 +73,7 @@ describe("Employee management", () => {
 
   it("allows only admins to create employees", async () => {
     const unauthorized = await request(app.server)
-      .post("/employees")
+      .post("/api/employees")
       .send({
         name: employee.name,
         email: employee.email,
@@ -83,10 +83,10 @@ describe("Employee management", () => {
     expect(unauthorized.status).toBe(401);
 
     const employeeSession = await request(app.server)
-      .post("/__tests__/employee-session")
+      .post("/api/__tests__/employee-session")
       .send();
     const denied = await request(app.server)
-      .post("/employees")
+      .post("/api/employees")
       .set("Cookie", sessionCookie(employeeSession))
       .send({
         name: employee.name,
@@ -103,10 +103,10 @@ describe("Employee management", () => {
       .mockResolvedValue(employee);
     try {
       const session = await request(app.server)
-        .post("/__tests__/admin-session")
+        .post("/api/__tests__/admin-session")
         .send();
       const response = await request(app.server)
-        .post("/employees")
+        .post("/api/employees")
         .set("Cookie", sessionCookie(session))
         .send({
           name: employee.name,
@@ -136,17 +136,17 @@ describe("Employee management", () => {
     const query = vi.spyOn(pool, "query");
     try {
       const session = await request(app.server)
-        .post("/__tests__/employee-session")
+        .post("/api/__tests__/employee-session")
         .send();
       query.mockResolvedValueOnce({ rows: [{}], rowCount: 1 } as never);
       const allowed = await request(app.server)
-        .get("/__tests__/member-read")
+        .get("/api/__tests__/member-read")
         .set("Cookie", sessionCookie(session));
       expect(allowed.status).toBe(200);
 
       query.mockResolvedValueOnce({ rows: [], rowCount: 0 } as never);
       const denied = await request(app.server)
-        .get("/__tests__/member-read")
+        .get("/api/__tests__/member-read")
         .set("Cookie", sessionCookie(session));
       expect(denied.status).toBe(403);
     } finally {

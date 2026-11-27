@@ -9,12 +9,12 @@ describe("Member management personal information", () => {
 
   beforeAll(async () => {
     app = await buildApp();
-    app.post("/__tests__/admin-session", async (req, reply) => {
+    app.post("/api/__tests__/admin-session", async (req, reply) => {
       req.session.userId = "00000000-0000-4000-8000-000000000001";
       req.session.role = "admin";
       return reply.send({ message: "Test session created" });
     });
-    app.post("/__tests__/member-session", async (req, reply) => {
+    app.post("/api/__tests__/member-session", async (req, reply) => {
       req.session.userId = "00000000-0000-4000-8000-000000000002";
       req.session.role = "member";
       return reply.send({ message: "Test session created" });
@@ -27,8 +27,8 @@ describe("Member management personal information", () => {
   });
 
   it("documents member sections and the flat registration payload in Swagger", async () => {
-    const operation = app.swagger().paths?.["/members"]?.post;
-    const deleteOperation = app.swagger().paths?.["/members/{id}"]?.delete;
+    const operation = app.swagger().paths?.["/api/members"]?.post;
+    const deleteOperation = app.swagger().paths?.["/api/members/{id}"]?.delete;
 
     expect(operation?.summary).toBe("Register a member");
     expect(deleteOperation?.summary).toBe("Deactivate a member");
@@ -53,16 +53,16 @@ describe("Member management personal information", () => {
 
   it("restricts member deactivation to admins", async () => {
     const unauthenticated = await request(app.server).delete(
-      "/members/00000000-0000-4000-8000-000000000003",
+      "/api/members/00000000-0000-4000-8000-000000000003",
     );
     expect(unauthenticated.status).toBe(401);
 
     const sessionResponse = await request(app.server)
-      .post("/__tests__/member-session")
+      .post("/api/__tests__/member-session")
       .send();
     const cookie = sessionResponse.headers["set-cookie"];
     const memberResponse = await request(app.server)
-      .delete("/members/00000000-0000-4000-8000-000000000003")
+      .delete("/api/members/00000000-0000-4000-8000-000000000003")
       .set(
         "Cookie",
         Array.isArray(cookie) ? (cookie[0] ?? "") : (cookie ?? ""),
@@ -78,7 +78,7 @@ describe("Member management personal information", () => {
       .mockResolvedValueOnce(false);
     try {
       const sessionResponse = await request(app.server)
-        .post("/__tests__/admin-session")
+        .post("/api/__tests__/admin-session")
         .send();
       const cookie = sessionResponse.headers["set-cookie"];
       const headers = {
@@ -86,13 +86,13 @@ describe("Member management personal information", () => {
       };
 
       const response = await request(app.server)
-        .delete("/members/00000000-0000-4000-8000-000000000003")
+        .delete("/api/members/00000000-0000-4000-8000-000000000003")
         .set(headers);
       expect(response.status).toBe(204);
       expect(response.text).toBe("");
 
       const missingResponse = await request(app.server)
-        .delete("/members/00000000-0000-4000-8000-000000000004")
+        .delete("/api/members/00000000-0000-4000-8000-000000000004")
         .set(headers);
       expect(missingResponse.status).toBe(404);
       expect(missingResponse.body).toHaveProperty("error", "Member not found");
@@ -107,7 +107,7 @@ describe("Member management personal information", () => {
   });
 
   it("requires an admin session to access member profiles", async () => {
-    const response = await request(app.server).get("/members");
+    const response = await request(app.server).get("/api/members");
 
     expect(response.status).toBe(401);
     expect(response.body).toHaveProperty("error", "Not authenticated");
@@ -115,12 +115,12 @@ describe("Member management personal information", () => {
 
   it("denies member access to non-admin users", async () => {
     const sessionResponse = await request(app.server)
-      .post("/__tests__/member-session")
+      .post("/api/__tests__/member-session")
       .send();
     const cookie = sessionResponse.headers["set-cookie"];
 
     const response = await request(app.server)
-      .get("/members")
+      .get("/api/members")
       .set(
         "Cookie",
         Array.isArray(cookie) ? (cookie[0] ?? "") : (cookie ?? ""),
@@ -131,7 +131,7 @@ describe("Member management personal information", () => {
 
   it("requires an admin session to request an S3 upload", async () => {
     const response = await request(app.server)
-      .post("/members/files/upload")
+      .post("/api/members/files/upload")
       .send({
         category: "image",
         content_type: "image/jpeg",
@@ -143,12 +143,12 @@ describe("Member management personal information", () => {
 
   it("rejects a file type that does not match its S3 category", async () => {
     const sessionResponse = await request(app.server)
-      .post("/__tests__/admin-session")
+      .post("/api/__tests__/admin-session")
       .send();
     const cookie = sessionResponse.headers["set-cookie"];
 
     const response = await request(app.server)
-      .post("/members/files/upload")
+      .post("/api/members/files/upload")
       .set("Cookie", Array.isArray(cookie) ? (cookie[0] ?? "") : (cookie ?? ""))
       .send({
         category: "image",
@@ -161,12 +161,12 @@ describe("Member management personal information", () => {
 
   it("requires the personal information fields marked mandatory in the form", async () => {
     const sessionResponse = await request(app.server)
-      .post("/__tests__/admin-session")
+      .post("/api/__tests__/admin-session")
       .send();
     const cookie = sessionResponse.headers["set-cookie"];
 
     const response = await request(app.server)
-      .post("/members")
+      .post("/api/members")
       .set("Cookie", Array.isArray(cookie) ? (cookie[0] ?? "") : (cookie ?? ""))
       .send({ first_name: "Asha" });
 
@@ -175,12 +175,12 @@ describe("Member management personal information", () => {
 
   it("rejects future member or nominee birth dates before database access", async () => {
     const sessionResponse = await request(app.server)
-      .post("/__tests__/admin-session")
+      .post("/api/__tests__/admin-session")
       .send();
     const cookie = sessionResponse.headers["set-cookie"];
 
     const response = await request(app.server)
-      .post("/members")
+      .post("/api/members")
       .set("Cookie", Array.isArray(cookie) ? (cookie[0] ?? "") : (cookie ?? ""))
       .send({
         first_name: "Asha",
@@ -200,12 +200,12 @@ describe("Member management personal information", () => {
 
   it("rejects a future nominee date of birth before writing to the database", async () => {
     const sessionResponse = await request(app.server)
-      .post("/__tests__/admin-session")
+      .post("/api/__tests__/admin-session")
       .send();
     const cookie = sessionResponse.headers["set-cookie"];
 
     const response = await request(app.server)
-      .post("/members")
+      .post("/api/members")
       .set("Cookie", Array.isArray(cookie) ? (cookie[0] ?? "") : (cookie ?? ""))
       .send({
         first_name: "Asha",
@@ -226,12 +226,12 @@ describe("Member management personal information", () => {
 
   it("accepts fields from every registration form section", async () => {
     const sessionResponse = await request(app.server)
-      .post("/__tests__/admin-session")
+      .post("/api/__tests__/admin-session")
       .send();
     const cookie = sessionResponse.headers["set-cookie"];
 
     const response = await request(app.server)
-      .post("/members")
+      .post("/api/members")
       .set("Cookie", Array.isArray(cookie) ? (cookie[0] ?? "") : (cookie ?? ""))
       .send({
         first_name: "Asha",
@@ -324,12 +324,12 @@ describe("Member management personal information", () => {
 
   it("validates optional email addresses when supplied", async () => {
     const sessionResponse = await request(app.server)
-      .post("/__tests__/admin-session")
+      .post("/api/__tests__/admin-session")
       .send();
     const cookie = sessionResponse.headers["set-cookie"];
 
     const response = await request(app.server)
-      .post("/members")
+      .post("/api/members")
       .set("Cookie", Array.isArray(cookie) ? (cookie[0] ?? "") : (cookie ?? ""))
       .send({
         first_name: "Asha",

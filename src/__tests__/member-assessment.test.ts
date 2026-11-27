@@ -36,12 +36,12 @@ describe("Member assessment credit bureau checks", () => {
 
   beforeAll(async () => {
     app = await buildApp();
-    app.post("/__tests__/admin-session", async (req, reply) => {
+    app.post("/api/__tests__/admin-session", async (req, reply) => {
       req.session.userId = actorId;
       req.session.role = "admin";
       return reply.send({ message: "Test session created" });
     });
-    app.post("/__tests__/member-session", async (req, reply) => {
+    app.post("/api/__tests__/member-session", async (req, reply) => {
       req.session.userId = memberId;
       req.session.role = "member";
       return reply.send({ message: "Test session created" });
@@ -85,27 +85,27 @@ describe("Member assessment credit bureau checks", () => {
       ]),
     );
     expect(
-      specification.paths?.["/members/{memberId}/credit-checks"]?.post
+      specification.paths?.["/api/members/{memberId}/credit-checks"]?.post
         ?.summary,
     ).toBe("Request a member credit bureau check");
     expect(
       JSON.stringify(
-        specification.paths?.["/members/{memberId}/credit-checks"]?.post,
+        specification.paths?.["/api/members/{memberId}/credit-checks"]?.post,
       ),
     ).toContain("does not request or return a score");
   });
 
   it("requires authentication and denies member access", async () => {
     const unauthenticated = await request(app.server).post(
-      `/members/${memberId}/credit-checks`,
+      `/api/members/${memberId}/credit-checks`,
     );
     expect(unauthenticated.status).toBe(401);
 
     const session = await request(app.server)
-      .post("/__tests__/member-session")
+      .post("/api/__tests__/member-session")
       .send();
     const denied = await request(app.server)
-      .post(`/members/${memberId}/credit-checks`)
+      .post(`/api/members/${memberId}/credit-checks`)
       .set("Cookie", sessionCookie(session));
 
     expect(denied.status).toBe(403);
@@ -117,10 +117,10 @@ describe("Member assessment credit bureau checks", () => {
       .mockResolvedValue(unavailableCheck);
     try {
       const session = await request(app.server)
-        .post("/__tests__/admin-session")
+        .post("/api/__tests__/admin-session")
         .send();
       const response = await request(app.server)
-        .post(`/members/${memberId}/credit-checks`)
+        .post(`/api/members/${memberId}/credit-checks`)
         .set("Cookie", sessionCookie(session));
 
       expect(response.status).toBe(503);
@@ -141,10 +141,10 @@ describe("Member assessment credit bureau checks", () => {
       .mockResolvedValue([unavailableCheck]);
     try {
       const session = await request(app.server)
-        .post("/__tests__/admin-session")
+        .post("/api/__tests__/admin-session")
         .send();
       const response = await request(app.server)
-        .get(`/members/${memberId}/credit-checks?limit=10`)
+        .get(`/api/members/${memberId}/credit-checks?limit=10`)
         .set("Cookie", sessionCookie(session));
 
       expect(response.status).toBe(200);

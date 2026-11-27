@@ -187,7 +187,7 @@ the previous container image.
 
 Before the first production deployment, take or verify a database backup.
 Migrations are not automatically reversed if the app image is rolled back.
-After deployment, check `/health`, `/docs`, authentication, and a safe
+After deployment, check `/api/health`, `/api/docs`, authentication, and a safe
 read-only endpoint. Confirm logs contain no secrets or member personal data.
 
 The standalone `test.yml` workflow runs coverage tests on `develop`; `ci-cd.yml`
