@@ -2,14 +2,14 @@
 
 This guide describes the repository's GitHub Actions CI, container image
 publishing, and EC2 deployment. The workflow is
-`.github/workflows/ci-cd.yml`. It verifies pull requests, publishes a
-commit-tagged image from `main`, and deploys that image to the configured EC2
-instance over SSH.
+`.github/workflows/ci-cd.yml`. It verifies pushes to `main`, publishes a
+commit-tagged image, and deploys that image to the configured EC2 instance over
+SSH.
 
 ## Recommended release flow
 
-1. A pull request runs checks against a disposable PostgreSQL database.
-2. A push to `main` runs verification, builds a multi-platform Docker image,
+1. A push to `main` runs checks against a disposable PostgreSQL database.
+2. The same push builds a multi-platform Docker image,
    publishes it to GitHub Container Registry (GHCR), then deploys that exact
    commit-tagged image to EC2 over SSH.
 
@@ -34,10 +34,10 @@ Before creating workflows:
 There is currently no lint script in `package.json`. Do not add `npm run lint`
 to a workflow until a lint tool and script have been configured.
 
-## 2. CI for pull requests
+## 2. CI on pushes to main
 
-The `verify` job in `.github/workflows/ci-cd.yml` runs for pull requests to
-`main` and pushes to `main`. It provisions a disposable PostgreSQL service,
+The `verify` job in `.github/workflows/ci-cd.yml` runs on pushes to `main`. It
+provisions a disposable PostgreSQL service,
 applies migrations, runs tests and the production build, and verifies that the
 Docker image builds. It uses only non-production database credentials and
 dummy secrets.
@@ -48,7 +48,7 @@ The tests should not connect to a real or persistent database.
 
 After the workflow is pushed:
 
-1. Push a branch and open a pull request.
+1. Push or merge a change to `main` to run the workflow.
 2. Confirm the PostgreSQL service becomes healthy and all workflow steps pass.
 3. If a test fails because a migration or schema is missing, fix the migration
    or test setup. Do not point CI at your local or production database.
@@ -95,9 +95,9 @@ these GitHub repository settings:
 
 | GitHub setting | Value |
 | --- | --- |
-| Repository variable `AWS_REGION` | `ap-southeast-2` |
-| Repository variable `EC2_HOST` | The instance public DNS name or IP |
-| Repository variable `EC2_USER` | SSH login user, such as `ubuntu` or `ec2-user` |
+| Repository secret `AWS_REGION` | `ap-southeast-2` |
+| Repository secret `EC2_HOST` | The instance public DNS name or IP |
+| Repository secret `EC2_USER` | SSH login user, such as `ubuntu` or `ec2-user` |
 | Repository secret `EC2_SSH_PRIVATE_KEY` | The private key matching an authorized key on the instance |
 | Repository secret `EC2_KNOWN_HOSTS` | The instance SSH host key, verified before saving |
 
@@ -111,26 +111,45 @@ The EC2 instance must:
   to run Docker and write under its home directory.
 - Have an instance role that can read the Parameter Store parameters below.
 
-Create these parameters in region `ap-southeast-2`:
+Create these parameters in the region configured by `AWS_REGION`:
 
 | Parameter name | Type | Value |
 | --- | --- | --- |
-| `/micro-finance/prod/app-env` | SecureString | The production `.env` contents, including the remote `DATABASE_URL`, `SESSION_SECRET`, `MEMBER_DATA_ENCRYPTION_KEY`, and S3 settings |
 | `/micro-finance/prod/ghcr-username` | String | GitHub account that owns the read-only package token |
 | `/micro-finance/prod/ghcr-read-token` | SecureString | GitHub token with `read:packages` access to this GHCR package |
 
 Grant the EC2 instance role `ssm:GetParameter` access to only these parameters
 and `kms:Decrypt` for the key used by SecureString parameters. This AWS role is
-used by the EC2 instance to retrieve runtime values; GitHub Actions does not
+used by the EC2 instance to retrieve GHCR credentials; GitHub Actions does not
 assume an AWS role. Do not put these values in the repository or workflow.
 
+Keep the production `.env` file local and gitignored; never commit it. To
+upload it to EC2 and recreate the API container with the new values, run this
+from the repository root:
+
+```bash
+bash .github/scripts/update-ec2-env.sh \
+  --host YOUR_EC2_PUBLIC_DNS_OR_IP \
+  --user ubuntu \
+  --key "$HOME/path/to/your-key.pem" \
+  --env-file .env
+```
+
+The command requires the EC2 host key to already be verified in
+`~/.ssh/known_hosts`; use `--known-hosts FILE` if it is stored elsewhere. It
+transfers the file over SSH, stores it at
+`~/.config/micro-finance-api/.env` on EC2 with owner-only permissions, and
+recreates the existing container using its current image. If no container
+exists yet, it installs the file for the next deployment. Never commit or
+share the `.env` file.
+
 On each successful push to `main`, the workflow connects over SSH, transfers
-the deploy script, and runs it on EC2. The script retrieves the environment and
-registry credentials from Parameter Store, pulls the GHCR image, runs pending
-database migrations, replaces the `micro-finance-api` container, and waits for
-its Docker health check. The container publishes port 3000; restrict that port
-in the instance security group and use HTTPS through a load balancer or reverse
-proxy for production.
+the deploy script, and runs it on EC2. The script uses the EC2-local `.env`,
+retrieves GHCR credentials from Parameter Store, pulls the GHCR image, runs
+pending database migrations, replaces the `micro-finance-api` container, and
+waits for its Docker health check. The container publishes port 3000; restrict
+that port in the instance security group and use HTTPS through a load balancer
+or reverse proxy for production.
 
 For production, also provision:
 
@@ -141,17 +160,17 @@ For production, also provision:
 - A trusted HTTPS endpoint, DNS, application logs, alerts, and a rollback
   procedure.
 
-Configure the app's runtime environment in the deployment platform or its
-secret manager:
+Set these runtime values in the production `.env` file on your computer, then
+upload it to EC2 using `.github/scripts/update-ec2-env.sh`:
 
 | Setting | How to provide it |
 | --- | --- |
-| `DATABASE_URL` | Full PostgreSQL connection string for the environment |
-| `SESSION_SECRET` | A strong, unique secret for each environment |
-| `MEMBER_DATA_ENCRYPTION_KEY` | The existing 32-byte hexadecimal key for that environment; preserve and back it up securely |
-| `AWS_REGION`, `AWS_S3_BUCKET` | The private bucket and its region |
-| `AWS_S3_IMAGES_PREFIX`, `AWS_S3_DOCUMENTS_PREFIX` | Separate object prefixes for images and documents |
-| `NODE_ENV` | Set to `production` in production |
+| `DATABASE_URL` | Full PostgreSQL connection string in the EC2-local `.env` file |
+| `SESSION_SECRET` | A strong, unique secret in the EC2-local `.env` file |
+| `MEMBER_DATA_ENCRYPTION_KEY` | The existing 32-byte hexadecimal key in the EC2-local `.env`; preserve and back it up securely |
+| `AWS_REGION`, `AWS_S3_BUCKET` | The private bucket and its region in the EC2-local `.env` |
+| `AWS_S3_IMAGES_PREFIX`, `AWS_S3_DOCUMENTS_PREFIX` | Separate object prefixes in the EC2-local `.env` |
+| `NODE_ENV` | Set to `production` in the EC2-local `.env` |
 | `PORT`, `HOST` | Use the container defaults unless the hosting platform requires otherwise |
 
 Prefer an IAM role for the running application to access S3. The EC2 instance
@@ -166,8 +185,8 @@ workflow logs or pass them in command-line arguments.
 ## 5. Deployment behavior and operations
 
 After verification and publishing succeed, the `deploy` job runs the SSH
-deployment script on EC2. It retrieves the runtime environment and GHCR
-credentials from Parameter Store, pulls the image for the current commit,
+deployment script on EC2. It uses the EC2-local runtime environment, retrieves
+GHCR credentials from Parameter Store, pulls the image for the current commit,
 applies migrations, replaces the container, and waits for its health check.
 If the new container does not become healthy, the script attempts to restore
 the previous container image.
