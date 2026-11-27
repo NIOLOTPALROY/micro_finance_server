@@ -1,22 +1,21 @@
 # CI/CD Guidelines
 
-This guide describes the repository's GitHub Actions CI and container image
-publishing, along with the remaining steps for deployment. The workflow is
-`.github/workflows/ci-cd.yml`. It verifies pull requests and publishes a
-commit-tagged image from `main`; it does not deploy to a running environment.
-Deployment depends on the hosting platform you choose.
+This guide describes the repository's GitHub Actions CI, container image
+publishing, and EC2 deployment. The workflow is
+`.github/workflows/ci-cd.yml`. It verifies pull requests, publishes a
+commit-tagged image from `main`, and deploys that image to the configured EC2
+instance over SSH.
 
 ## Recommended release flow
 
 1. A pull request runs checks against a disposable PostgreSQL database.
-2. Only passing changes can be merged into `main`.
-3. A change merged into `main` is built into a Docker image and published to
-   GitHub Container Registry (GHCR), tagged with the commit SHA.
-4. The exact image is deployed to staging and smoke-tested.
-5. After approval, the same image is deployed to production.
+2. A push to `main` runs verification, builds a multi-platform Docker image,
+   publishes it to GitHub Container Registry (GHCR), then deploys that exact
+   commit-tagged image to EC2 over SSH.
 
-Keep CI, image publishing, and deployment as separate steps. A passing test run
-does not mean a change is ready to deploy to production.
+The current workflow deploys directly to the configured instance after checks
+pass. Add branch protection and required reviews before using this for
+production.
 
 ## 1. Prepare the repository
 
@@ -29,9 +28,8 @@ Before creating workflows:
    or production session secrets. `.env` is ignored by Git and Docker.
 4. Use a separate, disposable database for CI. The test suite uses PostgreSQL;
    run the migrations before the tests.
-5. Decide where the app will run. Examples include a managed container service,
-   Kubernetes, or a virtual machine running Docker Compose. CI can be set up
-   before this decision; the final deployment job cannot.
+5. Configure the EC2 and GitHub prerequisites in section 4 before enabling
+   pushes to `main`.
 
 There is currently no lint script in `package.json`. Do not add `npm run lint`
 to a workflow until a lint tool and script have been configured.
@@ -88,14 +86,53 @@ image layers. The Docker image should contain the built application and
 migrations, not environment-specific configuration or credentials. Verify
 that the package visibility in GHCR is appropriate for the deployment host.
 
-## 4. Configure staging and production
+## 4. Configure the EC2 deployment
 
-Create GitHub Environments named `staging` and `production` under the
-repository's **Settings → Environments**. Use environment-specific secrets and
-variables. Enable required reviewers for production so a deploy cannot proceed
-without approval.
+### EC2 automatic deployment
 
-Provision the runtime outside the GitHub workflow:
+The deployment job connects to EC2 over SSH after publishing the image. Configure
+these GitHub repository settings:
+
+| GitHub setting | Value |
+| --- | --- |
+| Repository variable `AWS_REGION` | `ap-southeast-2` |
+| Repository variable `EC2_HOST` | The instance public DNS name or IP |
+| Repository variable `EC2_USER` | SSH login user, such as `ubuntu` or `ec2-user` |
+| Repository secret `EC2_SSH_PRIVATE_KEY` | The private key matching an authorized key on the instance |
+| Repository secret `EC2_KNOWN_HOSTS` | The instance SSH host key, verified before saving |
+
+The EC2 instance must:
+
+- Allow SSH from the GitHub Actions runner. Do not expose port 22 to
+  `0.0.0.0/0`; GitHub-hosted runner IPs change, so use a static-IP runner or a
+  self-hosted runner if you cannot restrict the source safely.
+- Have Docker and the AWS CLI installed and running, plus outbound access to
+  SSM, GHCR, and the remote PostgreSQL/S3 services. The SSH user must be able
+  to run Docker and write under its home directory.
+- Have an instance role that can read the Parameter Store parameters below.
+
+Create these parameters in region `ap-southeast-2`:
+
+| Parameter name | Type | Value |
+| --- | --- | --- |
+| `/micro-finance/prod/app-env` | SecureString | The production `.env` contents, including the remote `DATABASE_URL`, `SESSION_SECRET`, `MEMBER_DATA_ENCRYPTION_KEY`, and S3 settings |
+| `/micro-finance/prod/ghcr-username` | String | GitHub account that owns the read-only package token |
+| `/micro-finance/prod/ghcr-read-token` | SecureString | GitHub token with `read:packages` access to this GHCR package |
+
+Grant the EC2 instance role `ssm:GetParameter` access to only these parameters
+and `kms:Decrypt` for the key used by SecureString parameters. This AWS role is
+used by the EC2 instance to retrieve runtime values; GitHub Actions does not
+assume an AWS role. Do not put these values in the repository or workflow.
+
+On each successful push to `main`, the workflow connects over SSH, transfers
+the deploy script, and runs it on EC2. The script retrieves the environment and
+registry credentials from Parameter Store, pulls the GHCR image, runs pending
+database migrations, replaces the `micro-finance-api` container, and waits for
+its Docker health check. The container publishes port 3000; restrict that port
+in the instance security group and use HTTPS through a load balancer or reverse
+proxy for production.
+
+For production, also provision:
 
 - A PostgreSQL database that is private to the application, with automated
   backups and a tested restore procedure.
@@ -117,45 +154,31 @@ secret manager:
 | `NODE_ENV` | Set to `production` in production |
 | `PORT`, `HOST` | Use the container defaults unless the hosting platform requires otherwise |
 
-Prefer an IAM role or workload identity for the running application to access
-S3. If a deployment system must assume an AWS role, configure GitHub Actions
-OIDC with a narrowly scoped trust policy rather than storing long-lived AWS
-access keys in GitHub secrets. Runtime AWS access and deployment access are
-separate permissions.
+Prefer an IAM role for the running application to access S3. The EC2 instance
+role's runtime AWS access is separate from the SSH access used by GitHub
+Actions.
 
 **Important:** Back up `MEMBER_DATA_ENCRYPTION_KEY` securely and retain the
 same key when replacing or scaling app containers. If it is lost or changed,
 existing encrypted member data may become unreadable. Do not print secrets in
 workflow logs or pass them in command-line arguments.
 
-## 5. Add deployment in controlled stages
+## 5. Deployment behavior and operations
 
-The exact deployment commands depend on your selected host. Implement the
-deployment in this order:
+After verification and publishing succeed, the `deploy` job runs the SSH
+deployment script on EC2. It retrieves the runtime environment and GHCR
+credentials from Parameter Store, pulls the image for the current commit,
+applies migrations, replaces the container, and waits for its health check.
+If the new container does not become healthy, the script attempts to restore
+the previous container image.
 
-1. **Staging first:** deploy the SHA-tagged image to staging after CI and image
-   publishing succeed.
-2. **Migrate deliberately:** take or verify a database backup, then run
-   `npm run db:migrate` once as a release task using the new image and the
-   target environment's `DATABASE_URL`. Do not run the seed script; it deletes
-   users.
-3. **Start the app:** configure the platform to run the same SHA-tagged image.
-   The image health check requests `/health` and requires
-   `database: "ok"`.
-4. **Smoke-test:** check `/health`, `/docs`, authentication, and a safe
-   read-only endpoint. Confirm logs contain no secrets or member personal data.
-5. **Production approval:** after staging verification, require a reviewer to
-   approve the production environment.
-6. **Promote the same image:** deploy the same image SHA that passed staging.
-   Do not rebuild separately for production.
-7. **Monitor and roll back:** monitor errors, latency, and database health.
-   Roll back the app image if necessary, but remember that database migrations
-   are not automatically undone by an app rollback.
+Before the first production deployment, take or verify a database backup.
+Migrations are not automatically reversed if the app image is rolled back.
+After deployment, check `/health`, `/docs`, authentication, and a safe
+read-only endpoint. Confirm logs contain no secrets or member personal data.
 
-The local `docker-compose.yml` runs migrations when its app container starts;
-that is convenient for local development. For production, prefer a single
-explicit migration/release task rather than having every app replica run
-migrations on startup.
+The standalone `test.yml` workflow runs coverage tests on `develop`; `ci-cd.yml`
+is responsible for verification and deployment on `main`.
 
 Use backward-compatible database changes when deploying without downtime:
 
@@ -190,7 +213,8 @@ member data, address the production warnings in the README, including:
 
 - Open a pull request for all changes; do not push directly to `main`.
 - Require CI and review before merging.
-- Keep production deployment approval separate from code merge approval.
+- Configure GitHub Environment protection if a manual approval is required
+  before the production deploy job.
 - Pin third-party GitHub Actions to reviewed versions; periodically update
   them.
 - Review dependency updates and rebuild images regularly.

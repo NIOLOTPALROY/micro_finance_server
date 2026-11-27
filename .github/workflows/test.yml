@@ -2,13 +2,18 @@ name: Test suite
 
 on:
   push:
-    branches: [main, develop]
+    branches: [develop]
   pull_request:
-    branches: [main, develop]
+    branches: [develop]
 
 jobs:
   test:
     runs-on: ubuntu-latest
+
+    env:
+      DATABASE_URL: postgresql://postgres:password@localhost:5432/micro_finance_test
+      SESSION_SECRET: ci-only-session-secret-not-for-deployment
+      MEMBER_DATA_ENCRYPTION_KEY: 0000000000000000000000000000000000000000000000000000000000000000
 
     services:
       postgres:
@@ -31,17 +36,15 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '24'
 
       - name: Install dependencies
         run: npm ci
 
+      - name: Apply migrations to the disposable CI database
+        run: npm run db:migrate
+
       - name: Run tests with coverage
-        env:
-          DATABASE_URL: postgresql://postgres:password@localhost:5432/micro_finance_test
-          JWT_SECRET: test-secret-key-do-not-use-in-production
-          AUTH_COOKIE_MAX_AGE: 3600
-          MEMBER_DATA_ENCRYPTION_KEY: $(openssl rand -hex 32)
         run: npm run test:coverage
 
       - name: Upload coverage reports
@@ -52,8 +55,8 @@ jobs:
           flags: unittests
           name: codecov-umbrella
 
-      - name: Check coverage threshold (main branch only)
-        if: github.ref == 'refs/heads/main'
+      - name: Check coverage threshold (develop branch only)
+        if: github.ref == 'refs/heads/develop'
         run: |
           if [ -f coverage/coverage-summary.json ]; then
             COVERAGE=$(node -e "console.log(require('./coverage/coverage-summary.json').total.lines.pct)")
