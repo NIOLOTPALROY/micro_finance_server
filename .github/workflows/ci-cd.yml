@@ -78,6 +78,9 @@ jobs:
       - name: Check out source
         uses: actions/checkout@v4
 
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
@@ -109,5 +112,53 @@ jobs:
         with:
           context: .
           push: true
+          platforms: linux/amd64,linux/arm64
           tags: ${{ steps.metadata.outputs.tags }}
           labels: ${{ steps.metadata.outputs.labels }}
+
+  deploy:
+    name: deploy to EC2
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: publish
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Deploy image over SSH
+        env:
+          AWS_REGION: ${{ vars.AWS_REGION }}
+          EC2_HOST: ${{ vars.EC2_HOST }}
+          EC2_USER: ${{ vars.EC2_USER }}
+          EC2_SSH_PRIVATE_KEY: ${{ secrets.EC2_SSH_PRIVATE_KEY }}
+          EC2_KNOWN_HOSTS: ${{ secrets.EC2_KNOWN_HOSTS }}
+        run: |
+          set -euo pipefail
+          test -n "$AWS_REGION" || { echo "Set the AWS_REGION repository variable"; exit 1; }
+          test -n "$EC2_HOST" || { echo "Set the EC2_HOST repository variable"; exit 1; }
+          test -n "$EC2_USER" || { echo "Set the EC2_USER repository variable"; exit 1; }
+          test -n "$EC2_SSH_PRIVATE_KEY" || { echo "Set the EC2_SSH_PRIVATE_KEY repository secret"; exit 1; }
+          test -n "$EC2_KNOWN_HOSTS" || { echo "Set the EC2_KNOWN_HOSTS repository secret"; exit 1; }
+
+          repository="$(printf '%s' "$GITHUB_REPOSITORY" | tr '[:upper:]' '[:lower:]')"
+          image="ghcr.io/${repository}:sha-${GITHUB_SHA}"
+          script_b64="$(base64 -w 0 .github/scripts/deploy-ec2.sh)"
+          remote_command="AWS_REGION=$(printf '%q' "$AWS_REGION") APP_IMAGE=$(printf '%q' "$image") bash -c 'base64 -d | bash'"
+
+          install -m 700 -d "$HOME/.ssh"
+          printf '%s\n' "$EC2_SSH_PRIVATE_KEY" > "$HOME/.ssh/ec2_deploy_key"
+          printf '%s\n' "$EC2_KNOWN_HOSTS" > "$HOME/.ssh/known_hosts"
+          chmod 600 "$HOME/.ssh/ec2_deploy_key" "$HOME/.ssh/known_hosts"
+
+          printf '%s' "$script_b64" |
+            ssh \
+              -i "$HOME/.ssh/ec2_deploy_key" \
+              -o BatchMode=yes \
+              -o StrictHostKeyChecking=yes \
+              -o UserKnownHostsFile="$HOME/.ssh/known_hosts" \
+              "${EC2_USER}@${EC2_HOST}" \
+              "$remote_command"

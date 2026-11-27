@@ -1,8 +1,8 @@
-import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest';
+import { describe, it, expect, beforeAll, vi } from 'vitest';
 import request from 'supertest';
 import { createHash } from 'crypto';
 import { getTestApp } from '../utils/test/setup';
-import { cleanupDatabase, seedDatabase } from '../utils/test/db';
+import { seedDatabase } from '../utils/test/db';
 import { AuthUserRepository } from '../modules/auth/auth.repository';
 
 function getSessionCookie(response: { headers: Record<string, string | string[] | undefined> }): string {
@@ -19,10 +19,6 @@ describe('Auth Functionality', () => {
   beforeAll(async () => {
     app = await getTestApp();
     await seedDatabase(); // Seed database with admin users before tests
-  });
-
-  afterAll(async () => {
-    await cleanupDatabase(); // Clean up database after tests
   });
 
   it('should allow an admin to log in', async () => {
