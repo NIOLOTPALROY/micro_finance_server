@@ -49,7 +49,7 @@ export async function buildApp() {
       httpOnly: true,
       maxAge: 24 * 60 * 60 * 1000,
       path: "/",
-      sameSite: "lax",
+      sameSite: "none",
     },
     saveUninitialized: false,
   });
