@@ -95,7 +95,6 @@ these GitHub repository settings:
 
 | GitHub setting | Value |
 | --- | --- |
-| Repository secret `AWS_REGION` | `ap-southeast-2` |
 | Repository secret `EC2_HOST` | The instance public DNS name or IP |
 | Repository secret `EC2_USER` | SSH login user, such as `ubuntu` or `ec2-user` |
 | Repository secret `EC2_SSH_PRIVATE_KEY` | The private key matching an authorized key on the instance |
@@ -106,22 +105,16 @@ The EC2 instance must:
 - Allow SSH from the GitHub Actions runner. Do not expose port 22 to
   `0.0.0.0/0`; GitHub-hosted runner IPs change, so use a static-IP runner or a
   self-hosted runner if you cannot restrict the source safely.
-- Have Docker and the AWS CLI installed and running, plus outbound access to
-  SSM, GHCR, and the remote PostgreSQL/S3 services. The SSH user must be able
-  to run Docker and write under its home directory.
-- Have an instance role that can read the Parameter Store parameters below.
+- Have Docker installed and running, plus outbound access to GHCR, the remote
+  PostgreSQL database, and S3. The SSH user must be able to run Docker and write
+  under its home directory.
+- Have the GHCR package set to **Public** so EC2 can pull images without a
+  registry login or stored credentials.
 
-Create these parameters in the region configured by `AWS_REGION`:
-
-| Parameter name | Type | Value |
-| --- | --- | --- |
-| `/micro-finance/prod/ghcr-username` | String | GitHub account that owns the read-only package token |
-| `/micro-finance/prod/ghcr-read-token` | SecureString | GitHub token with `read:packages` access to this GHCR package |
-
-Grant the EC2 instance role `ssm:GetParameter` access to only these parameters
-and `kms:Decrypt` for the key used by SecureString parameters. This AWS role is
-used by the EC2 instance to retrieve GHCR credentials; GitHub Actions does not
-assume an AWS role. Do not put these values in the repository or workflow.
+To make the package public, open the repository's **Packages** page, select
+the `micro_finance_server` container package, open **Package settings**, choose
+**Change visibility → Public**, and confirm. Anyone will then be able to
+download the image.
 
 Keep the production `.env` file local and gitignored; never commit it. To
 upload it to EC2 and recreate the API container with the new values, run this
@@ -145,11 +138,12 @@ share the `.env` file.
 
 On each successful push to `main`, the workflow connects over SSH, transfers
 the deploy script, and runs it on EC2. The script uses the EC2-local `.env`,
-retrieves GHCR credentials from Parameter Store, pulls the GHCR image, runs
-pending database migrations, replaces the `micro-finance-api` container, and
-waits for its Docker health check. The container publishes port 3000; restrict
-that port in the instance security group and use HTTPS through a load balancer
-or reverse proxy for production.
+pulls the public GHCR image, runs pending database migrations, replaces the
+`micro-finance-api` container, and waits for its Docker health check. Making
+the image public means anyone can download it; do not include secrets in the
+image. The container publishes port 3000; restrict that port in the instance
+security group and use HTTPS through a load balancer or reverse proxy for
+production.
 
 For production, also provision:
 
@@ -173,9 +167,9 @@ upload it to EC2 using `.github/scripts/update-ec2-env.sh`:
 | `NODE_ENV` | Set to `production` in the EC2-local `.env` |
 | `PORT`, `HOST` | Use the container defaults unless the hosting platform requires otherwise |
 
-Prefer an IAM role for the running application to access S3. The EC2 instance
-role's runtime AWS access is separate from the SSH access used by GitHub
-Actions.
+If the application accesses S3, give the EC2 instance an IAM role with only the
+required S3 permissions. This role is unrelated to deployment and does not
+require Systems Manager access.
 
 **Important:** Back up `MEMBER_DATA_ENCRYPTION_KEY` securely and retain the
 same key when replacing or scaling app containers. If it is lost or changed,
@@ -185,9 +179,9 @@ workflow logs or pass them in command-line arguments.
 ## 5. Deployment behavior and operations
 
 After verification and publishing succeed, the `deploy` job runs the SSH
-deployment script on EC2. It uses the EC2-local runtime environment, retrieves
-GHCR credentials from Parameter Store, pulls the image for the current commit,
-applies migrations, replaces the container, and waits for its health check.
+deployment script on EC2. It uses the EC2-local runtime environment, pulls the
+public image for the current commit, applies migrations, replaces the
+container, and waits for its health check.
 If the new container does not become healthy, the script attempts to restore
 the previous container image.
 
