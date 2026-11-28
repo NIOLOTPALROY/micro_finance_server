@@ -24,6 +24,7 @@ declare module "@fastify/session" {
 export async function buildApp() {
   const app = fastify({
     logger: true,
+    trustProxy: true,
     requestTimeout: 10_000,
     keepAliveTimeout: 5_000,
   });
